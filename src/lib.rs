@@ -1,5 +1,5 @@
 use errors::ConversionError;
-use log::warn;
+use log::{warn, info};
 use num::Num;
 use pattern::{CulturePattern, NumberType, ParsingPattern, Patterns};
 
@@ -64,7 +64,7 @@ impl ConvertString {
     /// Get culture pattern from culture
     pub fn find_culture_pattern(culture: &Culture, patterns: &Patterns) -> Option<CulturePattern> {
         patterns
-            .get_culture_pattern()
+            .get_all_culture_pattern()
             .into_iter()
             .find(|c| c.get_cultures().iter().any(|cc| cc == culture))
     }
@@ -86,9 +86,18 @@ impl ConvertString {
         }
 
         // Return the pattern which match
-        all_patterns
+        match all_patterns
             .into_iter()
-            .find(|p| p.regex.is_match(string_num))
+            .find(|p| p.regex.is_match(string_num)) {
+                Some(pp) => {
+                    info!("Input = {} / Pattern found = {:?}", &string_num, &pp);
+                    return Some(pp);
+                },
+                None => {
+                    info!("No Pattern found for '{}'", &string_num);
+                    return None;
+                }
+            }
     }
 
     /// Return true is the string has been succesfully converted into number
@@ -159,12 +168,12 @@ impl<T: num::Num> Number<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ConvertString;
+    use crate::{ConvertString, Culture};
 
     #[test]
     fn test_common_number() {
-        let convert = ConvertString::new("10,2", None);
+        let convert = ConvertString::new("10,2", Some(Culture::French));
         // assert_eq!(convert.to_integer(), 10);
-        assert!(convert.is_integer());
+        assert!(convert.is_float());
     }
 }

@@ -1,11 +1,8 @@
-use std::string;
-
 use crate::number_conversion::FloatConversion;
 use crate::number_conversion::IntegerConversion;
 use crate::number_conversion::StringNumber;
 use crate::Culture;
 use crate::Number;
-use num;
 use regex::Regex;
 
 /// Represent if the number is Whole (int), or Decimal (float)
@@ -113,8 +110,16 @@ impl Patterns {
         Patterns::default()
     }
 
-    pub fn get_culture_pattern(&self) -> Vec<CulturePattern> {
+    pub fn get_all_culture_pattern(&self) -> Vec<CulturePattern> {
         self.culture_pattern.to_vec()
+    }
+
+    pub fn get_culture_pattern(&self, culture: &Culture) -> Option<CulturePattern> {
+        self.get_all_culture_pattern().into_iter().find(|c| {
+            c.get_cultures()
+                .into_iter()
+                .any(|sub_culture| sub_culture == culture)
+        })
     }
 
     pub fn add_culture_pattern(&mut self, pattern: CulturePattern) {
@@ -205,9 +210,39 @@ impl Default for Patterns {
 mod tests {
     use regex::Regex;
 
+    use crate::Culture;
+
+    use super::Patterns;
+
+    // #[ctor::ctor]
+    // fn init() {
+    //     env_logger::init();
+    // }
+
     #[test]
     fn test_regex() {
         let r = Regex::new(r"[\-\+]?\d+([0-9]{3})*").unwrap();
         assert!(r.is_match("10,2"));
+    }
+
+    #[test]
+    fn test_parsing_pattern_fr() {
+        let optionnal_fr_pattern = Patterns::default().get_culture_pattern(&Culture::French);
+
+        //We need to have an fr pattern
+        assert!(optionnal_fr_pattern.is_some());
+        let fr_pattern = optionnal_fr_pattern.unwrap();
+        assert_eq!(fr_pattern.get_name(), "fr");
+        assert!(fr_pattern.get_patterns().len() > 0);
+    }
+
+    fn test_parsing_pattern_en() {
+        let optionnal_en_pattern = Patterns::default().get_culture_pattern(&Culture::English);
+
+        //We need to have an fr pattern
+        assert!(optionnal_en_pattern.is_some());
+        let en_pattern = optionnal_en_pattern.unwrap();
+        assert_eq!(en_pattern.get_name(), "fr");
+        assert!(en_pattern.get_patterns().len() > 0);
     }
 }
