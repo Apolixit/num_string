@@ -62,17 +62,12 @@ impl ConvertString {
     // }
 
     /// Get culture pattern from culture
-    pub fn find_culture_pattern(
-        culture: &Culture,
-        patterns: &Patterns,
-    ) -> Option<CulturePattern> {
+    pub fn find_culture_pattern(culture: &Culture, patterns: &Patterns) -> Option<CulturePattern> {
         patterns
             .get_culture_pattern()
             .into_iter()
             .find(|c| c.get_cultures().iter().any(|cc| cc == culture))
     }
-
-
 
     pub fn find_pattern(
         string_num: &str,
@@ -122,7 +117,7 @@ impl ConvertString {
     /// Convert the string into an integer
     pub fn to_integer(&self) -> Option<i32> {
         if let Some(pp) = self.get_current_pattern() {
-
+            return pp.to_integer(String::from(&self.string_num)).map(|n| n.num);
         }
 
         None
@@ -130,10 +125,12 @@ impl ConvertString {
 
     /// Convert the string into an float
     pub fn to_float(&self) -> Option<f32> {
-        todo!()
+        if let Some(pp) = self.get_current_pattern() {
+            return pp.to_float(String::from(&self.string_num)).map(|n| n.num);
+        }
+
+        None
     }
-
-
 }
 
 pub struct FormatOption {

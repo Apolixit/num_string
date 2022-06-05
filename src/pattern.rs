@@ -1,3 +1,8 @@
+use std::string;
+
+use crate::number_conversion::FloatConversion;
+use crate::number_conversion::IntegerConversion;
+use crate::number_conversion::StringNumber;
 use crate::Culture;
 use crate::Number;
 use num;
@@ -22,7 +27,8 @@ pub struct RegexPattern {
 
 impl RegexPattern {
     pub fn is_match(&self, text: &str) -> bool {
-        let full_regex = Regex::new(format!("{}{}{}", self.prefix, self.content, self.suffix).as_str()).unwrap();
+        let full_regex =
+            Regex::new(format!("{}{}{}", self.prefix, self.content, self.suffix).as_str()).unwrap();
         full_regex.is_match(text)
     }
 }
@@ -41,7 +47,21 @@ pub struct ParsingPattern {
 }
 
 impl ParsingPattern {
+    pub fn to_integer(&self, string_number: String) -> Option<Number<i32>> {
+        self.parsing(string_number).to_integer().ok()
+    }
 
+    pub fn to_float(&self, string_number: String) -> Option<Number<f32>> {
+        self.parsing(string_number).to_float().ok()
+    }
+
+    fn parsing(&self, string_number: String) -> StringNumber {
+        if self.culture_settings.is_none() {
+            StringNumber::new(string_number)
+        } else {
+            StringNumber::new_with_settings(string_number, self.culture_settings.clone().unwrap())
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
