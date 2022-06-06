@@ -282,7 +282,7 @@ impl Default for Patterns {
                             suffix: Regex::new(r"$").unwrap(),
                         },
                     },
-                    
+
                     ParsingPattern {
                         /**
                         * X,XXX
@@ -412,6 +412,7 @@ mod tests {
         assert!(fr_pattern.get_patterns().len() > 0);
     }
 
+    #[test]
     fn test_parsing_pattern_en() {
         let optionnal_en_pattern = Patterns::default().get_culture_pattern(&Culture::English);
 
@@ -422,6 +423,7 @@ mod tests {
         assert!(en_pattern.get_patterns().len() > 0);
     }
 
+    #[test]
     fn test_parsing_pattern_it() {
         let optionnal_en_pattern = Patterns::default().get_culture_pattern(&Culture::Italian);
 

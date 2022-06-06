@@ -1,6 +1,4 @@
-use std::str::FromStr;
-
-use log::{error, info, trace};
+use log::{trace, warn};
 use regex::Regex;
 
 use crate::{errors::ConversionError, pattern::NumberCultureSettings, Number};
@@ -41,17 +39,6 @@ impl StringNumber {
         self.number_culture_settings.is_some()
     }
 
-    /// If the decimal separator is a point, we don't need to replace it
-    pub fn is_need_replace_decimal_separator(&self) -> bool {
-        self.has_settings()
-            && &self
-                .number_culture_settings
-                .as_ref()
-                .unwrap()
-                .decimal_separator
-                != &StringNumber::string_decimal_replacement()
-    }
-
     pub fn string_decimal_replacement() -> String {
         String::from(".")
     }
@@ -63,7 +50,7 @@ impl StringNumber {
 
     /// Replace the string which match the regex by the replacement string
     fn replace_element(string_number: &str, string_regex: &str, replacement: &str) -> String {
-        let regex_space = Regex::new(string_regex).unwrap();
+        let regex_space = Regex::new(format!(r"[\\{}]", string_regex).as_str()).unwrap();
         trace!(
             "Regex replace : {:?} / string_value = {} / string replacement = {}",
             regex_space,
@@ -96,21 +83,7 @@ impl StringNumber {
                 &self.get_settings().unwrap().decimal_separator,
                 &self.get_settings().unwrap().thousand_separator
             );
-            trace!("Begin decimal separator replace");
-            if self.is_need_replace_decimal_separator() {
-                string_value = replace(
-                    &string_value,
-                    &self.get_settings().unwrap().decimal_separator.as_str(),
-                    ".",
-                );
-                trace!(
-                    "End decimal separator replace. string_value = {}",
-                    string_value
-                );
-            } else {
-                trace!("No need to parse decimal separator");
-            }
-            
+
             trace!("Begin thousand separator replace");
             string_value = replace(
                 &string_value,
@@ -119,6 +92,17 @@ impl StringNumber {
             );
             trace!(
                 "End thousand separator replace. string_value = {}",
+                string_value
+            );
+
+            trace!("Begin decimal separator replace");
+            string_value = replace(
+                &string_value,
+                &self.get_settings().unwrap().decimal_separator.as_str(),
+                StringNumber::string_decimal_replacement().as_str(),
+            );
+            trace!(
+                "End decimal separator replace. string_value = {}",
                 string_value
             );
         } else {
@@ -138,7 +122,7 @@ impl StringNumber {
 impl IntegerConversion<i32> for StringNumber {
     fn to_integer(&self) -> Result<Number<i32>, ConversionError> {
         Ok(Number::new(self.clean().parse::<f32>().map_err(|e| {
-            error!("{}", e.to_string());
+            warn!("{}", e.to_string());
             ConversionError::UnableToConvert
         })? as i32))
     }
@@ -148,7 +132,7 @@ impl IntegerConversion<i32> for StringNumber {
 impl FloatConversion<f32> for StringNumber {
     fn to_float(&self) -> Result<Number<f32>, ConversionError> {
         Ok(Number::new(self.clean().parse::<f32>().map_err(|e| {
-            error!("{}", e.to_string());
+            warn!("{}", e.to_string());
             ConversionError::UnableToConvert
         })?))
     }
@@ -161,12 +145,6 @@ mod tests {
         number_conversion::{FloatConversion, IntegerConversion, StringNumber},
         pattern::NumberCultureSettings,
     };
-
-    // Run this function before each test
-    #[ctor::ctor]
-    fn init() {
-        env_logger::init();
-    }
 
     #[test]
     fn number_conversion_whole() {
@@ -239,10 +217,44 @@ mod tests {
     }
 
     #[test]
+    fn number_conversion_others() {
+        let wn = StringNumber::new_with_settings(
+            String::from("10.000.000"),
+            NumberCultureSettings::new(".", ","),
+        );
+        assert_eq!(wn.to_integer().unwrap(), 10_000_000);
+
+
+        let wn = StringNumber::new_with_settings(
+            String::from("10,000,000"),
+            NumberCultureSettings::new(",", "."),
+        );
+        assert_eq!(wn.to_integer().unwrap(), 10_000_000);
+
+        let wn = StringNumber::new_with_settings(
+            String::from("10,000,000"),
+            NumberCultureSettings::new(" ", ","),
+        );
+        assert_eq!(wn.to_integer(), Err(ConversionError::UnableToConvert));
+
+        let wn = StringNumber::new_with_settings(
+            String::from("1.000,45"),
+            NumberCultureSettings::new(".", ","),
+        );
+        assert_eq!(wn.to_float().unwrap(), 1_000.45);
+
+        let wn = StringNumber::new_with_settings(
+            String::from("1.000"),
+            NumberCultureSettings::new(".", ","),
+        );
+        assert_eq!(wn.to_float().unwrap(), 1_000.0);
+    }
+
+    #[test]
     fn number_conversion_not_allowed() {
         let list = vec!["x", "10*5", "2..500"];
 
-        for (string_value) in list {
+        for string_value in list {
             let wn = StringNumber::new(String::from(string_value));
 
             assert_eq!(wn.to_integer(), Err(ConversionError::UnableToConvert));

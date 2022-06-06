@@ -183,9 +183,14 @@ impl<T: num::Num + Display> Display for Number<T> {
 
 #[cfg(test)]
 mod tests {
-    use log::{info, warn};
-
+    use log::{info};
     use crate::{pattern::NumberType, ConvertString, Culture};
+
+    // Run this function before each test
+    #[ctor::ctor]
+    fn init() {
+        env_logger::init();
+    }
 
     #[test]
     fn test_common_number() {
@@ -252,6 +257,7 @@ mod tests {
         test_number(Some(Culture::English), list);
     }
 
+    #[test]
     fn test_number_italian() {
         let list = vec![
             ("10", 10, 10.0, NumberType::WHOLE),
@@ -271,7 +277,7 @@ mod tests {
                 NumberType::DECIMAL,
             ),
             (
-                "1000,4564654654654",
+                "1.000,4564654654654",
                 1000,
                 1000.4564654654654,
                 NumberType::DECIMAL,
