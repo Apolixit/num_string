@@ -1,13 +1,15 @@
+use std::fmt::Display;
+
 use log::{trace, warn};
 use regex::Regex;
 
 use crate::{errors::ConversionError, pattern::NumberCultureSettings, Number};
 
-pub trait IntegerConversion<I: num::Integer> {
+pub trait IntegerConversion<I: num::Integer + Display> {
     fn to_integer(&self) -> Result<Number<I>, ConversionError>;
 }
 
-pub trait FloatConversion<F: num::Float> {
+pub trait FloatConversion<F: num::Float + Display> {
     fn to_float(&self) -> Result<Number<F>, ConversionError>;
 }
 
@@ -115,6 +117,13 @@ impl StringNumber {
             string_value
         );
         string_value
+    }
+
+    pub fn split_number<T: num::Num + Display>(num: T) -> (String, String) {
+        let regex = Regex::new(r"[0-9]+([\.])([0-9]+)").unwrap();
+
+        regex.captures(num.to_string().as_str());
+        todo!()
     }
 }
 

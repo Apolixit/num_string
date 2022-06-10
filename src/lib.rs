@@ -1,8 +1,9 @@
 use errors::ConversionError;
 use log::{info, warn};
 use num::Num;
+use num_format::{WriteFormatted, Locale, ToFormattedString, CustomFormat, Grouping, Buffer};
 use pattern::{CulturePattern, NumberType, ParsingPattern, Patterns};
-use std::fmt::Display;
+use std::fmt::{Display, write};
 
 mod errors;
 mod number_conversion;
@@ -20,6 +21,20 @@ pub enum Culture {
 impl Default for &Culture {
     fn default() -> Self {
         &Culture::English
+    }
+}
+
+impl Culture {
+    pub fn to_local(&self) -> Locale {
+        Culture::to_num_format_local(self)
+    }
+
+    pub fn to_num_format_local(culture: &Culture) -> Locale {
+        match culture {
+            Culture::English => Locale::en,
+            Culture::French => Locale::fr,
+            Culture::Italian => Locale::it
+        }
     }
 }
 
@@ -150,26 +165,63 @@ pub struct FormatOption {
     maximum_fraction_digit: u8,
 }
 
+impl FormatOption {
+    pub fn new(minimum_fraction_digit: u8, maximum_fraction_digit: u8) -> FormatOption {
+        FormatOption { minimum_fraction_digit, maximum_fraction_digit }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Number<T: Num> {
+pub struct Number<T: Num + Display> {
     num: T,
 }
 
-impl<T: num::Num> Number<T> {
+impl<T: num::Num + Display> Number<T> {
     pub fn new(num: T) -> Number<T> {
         Number { num }
     }
 
-    pub fn to_format() {
-        todo!()
+    pub fn to_format(&self, culture: &Culture) -> Result<String, ConversionError> {
+        self.to_format_options(culture, FormatOption::new(2, 2))
     }
 
-    pub fn to_format_options(options: FormatOption) {
+    pub fn to_format_options(&self, culture: &Culture, options: FormatOption) -> Result<String, ConversionError> {
+        // let mut writer = String::new();
+        // let format = CustomFormat::builder()
+        //     .grouping(Grouping::Standard)
+        //     .separator(" ")
+        //     .decimal(",")
+        //     .build()?;
+        // 10.to_formatted_string(&culture.to_local());
+        // let mut buf = Buffer::new();
+        // buf.write_formatted(&10, &format);
+        // buf.write_formatted(&10.2, &format);
+        // let f = 10.0;
+
+        // f.0.to_formatted_string(&culture.to_local());
+        // writer.write_formatted(&self.num, &culture.to_local()).map_err(|e| ConversionError::UnableToDisplayFormat)?;
+        // Ok(writer)
         todo!()
     }
 }
 
-impl<T: num::Num> PartialEq<T> for Number<T> {
+// impl<T: num::Num + Display> ToFormattedString for Number<T> {
+//     fn read_to_fmt_writer<F, W>(&self, w: W, format: &F) -> Result<usize, std::fmt::Error>
+//     where
+//         F: num_format::Format,
+//         W: std::fmt::Write {
+//         write!(w, "{}", &self.to_string())
+//     }
+
+//     fn read_to_io_writer<F, W>(&self, w: W, format: &F) -> Result<usize, std::io::Error>
+//     where
+//         F: num_format::Format,
+//         W: std::io::Write {
+//         todo!()
+//     }
+// }
+
+impl<T: num::Num + Display> PartialEq<T> for Number<T> {
     fn eq(&self, other: &T) -> bool {
         &self.num == other
     }
@@ -184,7 +236,10 @@ impl<T: num::Num + Display> Display for Number<T> {
 #[cfg(test)]
 mod tests {
     use log::{info};
+    use num::Float;
+    use regex::Regex;
     use crate::{pattern::NumberType, ConvertString, Culture};
+    use thousands::Separable;
 
     // Run this function before each test
     #[ctor::ctor]
@@ -355,4 +410,64 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_test() {
+        let int = 1000;
+        let float = 1000.32;
+        let zob = int.separate_with_commas();
+        assert_eq!(int.separate_with_commas(), "1,000".to_owned());
+
+        assert_eq!(float.to_string(), "1000.32");
+
+        let regex = Regex::new(r"[0-9]+([\.])([0-9]+)").unwrap();
+        let capture = regex.captures("1000.32").unwrap();
+        info!("Hehe {:?}", capture);
+
+        // let x1 = 1000.32;
+        // let x2 = 1000;
+        // let x3 = x1 - x2 as f64;
+        // assert_eq!(x3, 0.32);
+        // assert_eq!(x3.to_string(), "0.32");
+        // assert_eq!(1000.32.trunc() as i32, 1000);
+        // assert_eq!(1000.99 as i32, 1000);
+        // let mut writer = String::new();
+        // let format = CustomFormat::builder()
+        //     .grouping(Grouping::Standard)
+        //     .separator(" ")
+        //     .decimal(",")
+        //     .build()?;
+        // 10.to_formatted_string(&culture.to_local());
+        // let mut buf = Buffer::new();
+        // buf.write_formatted(&10, &format);
+        // buf.write_formatted(&10.2, &format);
+        // let f = 10.0;
+
+        // f.0.to_formatted_string(&culture.to_local());
+        // writer.write_formatted(&self.num, &culture.to_local()).map_err(|e| ConversionError::UnableToDisplayFormat)?;
+        // Ok(writer)
+    }
 }
+
+
+// macro_rules! impl_from {
+//     ($T:ty, $from_ty:path) => {
+//         impl From<$T> for Decimal {
+//             #[inline]
+//             fn from(t: $T) -> Decimal {
+//                 $from_ty(t).unwrap()
+//             }
+//         }
+//     }
+// }
+
+// impl_from!(isize, FromPrimitive::from_isize);
+// impl_from!(i8, FromPrimitive::from_i8);
+// impl_from!(i16, FromPrimitive::from_i16);
+// impl_from!(i32, FromPrimitive::from_i32);
+// impl_from!(i64, FromPrimitive::from_i64);
+// impl_from!(usize, FromPrimitive::from_usize);
+// impl_from!(u8, FromPrimitive::from_u8);
+// impl_from!(u16, FromPrimitive::from_u16);
+// impl_from!(u32, FromPrimitive::from_u32);
+// impl_from!(u64, FromPrimitive::from_u64);

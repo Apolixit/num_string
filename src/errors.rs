@@ -3,6 +3,7 @@ use std::{fmt::Display};
 #[derive(Debug, PartialEq)]
 pub enum ConversionError {
     UnableToConvert,
+    UnableToDisplayFormat,
     PatternCultureNotFound
 }
 
@@ -10,6 +11,7 @@ impl ConversionError {
     pub fn message(&self) -> &str {
         match self {
             Self::UnableToConvert => "Error when trying to parse string number to number",
+            Self::UnableToDisplayFormat => "Error when trying to display format number",
             Self::PatternCultureNotFound => "Unable to find pattern culture"
         }
     }
