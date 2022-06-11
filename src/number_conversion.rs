@@ -132,7 +132,7 @@ impl IntegerConversion<i32> for StringNumber {
     fn to_integer(&self) -> Result<Number<i32>, ConversionError> {
         Ok(Number::new(self.clean().parse::<f32>().map_err(|e| {
             warn!("{}", e.to_string());
-            ConversionError::UnableToConvert
+            ConversionError::UnableToConvertStringToNumber
         })? as i32))
     }
 }
@@ -142,7 +142,7 @@ impl FloatConversion<f32> for StringNumber {
     fn to_float(&self) -> Result<Number<f32>, ConversionError> {
         Ok(Number::new(self.clean().parse::<f32>().map_err(|e| {
             warn!("{}", e.to_string());
-            ConversionError::UnableToConvert
+            ConversionError::UnableToConvertStringToNumber
         })?))
     }
 }
@@ -152,7 +152,7 @@ mod tests {
     use crate::{
         errors::ConversionError,
         number_conversion::{FloatConversion, IntegerConversion, StringNumber},
-        pattern::NumberCultureSettings,
+        pattern::{NumberCultureSettings, Separator},
     };
 
     #[test]
@@ -199,10 +199,11 @@ mod tests {
             ("1000,4564654654654", 1000, 1000.4564654654654),
         ];
 
+
         for (string_value, int_value, float_value) in list {
             let wn = StringNumber::new_with_settings(
                 String::from(string_value),
-                NumberCultureSettings::new(" ", ","),
+                NumberCultureSettings::from(("", ",")),
             );
 
             let int_conversion = wn.to_integer().expect(
@@ -229,32 +230,32 @@ mod tests {
     fn number_conversion_others() {
         let wn = StringNumber::new_with_settings(
             String::from("10.000.000"),
-            NumberCultureSettings::new(".", ","),
+            NumberCultureSettings::from((".", ",")),
         );
         assert_eq!(wn.to_integer().unwrap(), 10_000_000);
 
 
         let wn = StringNumber::new_with_settings(
             String::from("10,000,000"),
-            NumberCultureSettings::new(",", "."),
+            NumberCultureSettings::from((",", ".")),
         );
         assert_eq!(wn.to_integer().unwrap(), 10_000_000);
 
         let wn = StringNumber::new_with_settings(
             String::from("10,000,000"),
-            NumberCultureSettings::new(" ", ","),
+            NumberCultureSettings::from((" ", ",")),
         );
-        assert_eq!(wn.to_integer(), Err(ConversionError::UnableToConvert));
+        assert_eq!(wn.to_integer(), Err(ConversionError::UnableToConvertStringToNumber));
 
         let wn = StringNumber::new_with_settings(
             String::from("1.000,45"),
-            NumberCultureSettings::new(".", ","),
+            NumberCultureSettings::from((".", ",")),
         );
         assert_eq!(wn.to_float().unwrap(), 1_000.45);
 
         let wn = StringNumber::new_with_settings(
             String::from("1.000"),
-            NumberCultureSettings::new(".", ","),
+            NumberCultureSettings::from((".", ",")),
         );
         assert_eq!(wn.to_float().unwrap(), 1_000.0);
     }
@@ -266,7 +267,7 @@ mod tests {
         for string_value in list {
             let wn = StringNumber::new(String::from(string_value));
 
-            assert_eq!(wn.to_integer(), Err(ConversionError::UnableToConvert));
+            assert_eq!(wn.to_integer(), Err(ConversionError::UnableToConvertStringToNumber));
         }
     }
 }

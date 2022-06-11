@@ -2,17 +2,23 @@ use std::{fmt::Display};
 
 #[derive(Debug, PartialEq)]
 pub enum ConversionError {
-    UnableToConvert,
+    UnableToConvertStringToNumber,
+    UnableToConvertNumberToString,
+    NotCaptureFoundWhenConvertNumberToString,
     UnableToDisplayFormat,
-    PatternCultureNotFound
+    PatternCultureNotFound,
+    SeparatorNotFound,
 }
 
 impl ConversionError {
     pub fn message(&self) -> &str {
         match self {
-            Self::UnableToConvert => "Error when trying to parse string number to number",
+            Self::UnableToConvertStringToNumber => "Error when trying to parse string number to number",
+            Self::UnableToConvertNumberToString => "Error when trying to parse number to string number",
+            Self::NotCaptureFoundWhenConvertNumberToString => "No capture found when trying to parse number to string number",
             Self::UnableToDisplayFormat => "Error when trying to display format number",
-            Self::PatternCultureNotFound => "Unable to find pattern culture"
+            Self::PatternCultureNotFound => "Unable to find pattern culture",
+            Self::SeparatorNotFound => "Unable to find separator from string"
         }
     }
 }
