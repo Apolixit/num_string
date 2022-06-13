@@ -1,3 +1,4 @@
+use crate::number::Number;
 use errors::ConversionError;
 use log::{error, info, trace, warn};
 use num::Num;
@@ -11,6 +12,7 @@ use thousands::Separable;
 mod errors;
 mod number_conversion;
 mod pattern;
+mod number;
 
 /// Represent the current "ConvertString" culture
 #[derive(PartialEq, Debug, Clone, Copy)]
@@ -164,134 +166,134 @@ impl Default for FormatOption {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Number<T: Num + Display> {
-    num: T,
-}
+// #[derive(Debug, Clone, Copy, PartialEq)]
+// pub struct Number<T: Num + Display> {
+//     num: T,
+// }
 
-impl<T: num::Num + Display> Number<T> {
-    pub fn new(num: T) -> Number<T> {
-        Number { num }
-    }
+// impl<T: num::Num + Display> Number<T> {
+//     pub fn new(num: T) -> Number<T> {
+//         Number { num }
+//     }
 
-    /// Split the current number into a string
-    /// Return the Sign, the Whole part and the optional Decimal part
-    /// For example :
-    ///     10000.65    should return : ("+", "10000", Some("65"))
-    ///     -10         should return : ("-", "10", None)
-    /// See 'test_split_number' for example
-    pub fn regex_read_number(&self) -> Result<(String, String, Option<String>), ConversionError> {
-        let str = &self.num.to_string();
+//     /// Split the current number into a string
+//     /// Return the Sign, the Whole part and the optional Decimal part
+//     /// For example :
+//     ///     10000.65    should return : ("+", "10000", Some("65"))
+//     ///     -10         should return : ("-", "10", None)
+//     /// See 'test_split_number' for example
+//     pub fn regex_read_number(&self) -> Result<(String, String, Option<String>), ConversionError> {
+//         let str = &self.num.to_string();
 
-        let regex = Regex::new(r"([\-\+]?)([0-9]+)([\.]?)([0-9]*)").map_err(|e| {
-            error!("{:?}", e);
-            return ConversionError::UnableToConvertNumberToString;
-        })?;
+//         let regex = Regex::new(r"([\-\+]?)([0-9]+)([\.]?)([0-9]*)").map_err(|e| {
+//             error!("{:?}", e);
+//             return ConversionError::UnableToConvertNumberToString;
+//         })?;
 
-        let capture = regex
-            .captures(str)
-            .ok_or(ConversionError::NotCaptureFoundWhenConvertNumberToString)?;
-        trace!("Text : {} / {:?}", str, capture);
+//         let capture = regex
+//             .captures(str)
+//             .ok_or(ConversionError::NotCaptureFoundWhenConvertNumberToString)?;
+//         trace!("Text : {} / {:?}", str, capture);
 
-        let capt = |index: usize| -> Option<String> {
-            if let Some(matched) = capture.get(index) {
-                let match_str = matched.as_str();
-                if match_str.is_empty() {
-                    return None;
-                } else {
-                    return Some(String::from(match_str));
-                }
-            }
-            None
-        };
+//         let capt = |index: usize| -> Option<String> {
+//             if let Some(matched) = capture.get(index) {
+//                 let match_str = matched.as_str();
+//                 if match_str.is_empty() {
+//                     return None;
+//                 } else {
+//                     return Some(String::from(match_str));
+//                 }
+//             }
+//             None
+//         };
 
-        // Respectively : Sign (+ / -) | Whole part | Decimal part
-        Ok((
-            capt(1).unwrap_or(String::from("+")),
-            capt(2).ok_or(ConversionError::UnableToConvertNumberToString)?,
-            capt(4),
-        ))
-    }
+//         // Respectively : Sign (+ / -) | Whole part | Decimal part
+//         Ok((
+//             capt(1).unwrap_or(String::from("+")),
+//             capt(2).ok_or(ConversionError::UnableToConvertNumberToString)?,
+//             capt(4),
+//         ))
+//     }
 
-    /// Return number to the current default culture format
-    pub fn to_format(&self, culture: &Culture) -> Result<String, ConversionError> {
-        self.to_format_options(culture, FormatOption::new(2, 2))
-    }
+//     /// Return number to the current default culture format
+//     pub fn to_format(&self, culture: &Culture) -> Result<String, ConversionError> {
+//         self.to_format_options(culture, FormatOption::new(2, 2))
+//     }
 
-    fn apply_thousand_separator(num: i32, culture: &Culture) -> String {
-        let culture_settings = NumberCultureSettings::from(*culture);
-        match culture_settings.to_thousand_separator() {
-            Separator::COMMA => num.separate_with_commas(),
-            Separator::DOT => num.separate_with_dots(),
-            Separator::SPACE => num.separate_with_spaces(),
-        }
-    }
+//     fn apply_thousand_separator(num: i32, culture: &Culture) -> String {
+//         let culture_settings = NumberCultureSettings::from(*culture);
+//         match culture_settings.to_thousand_separator() {
+//             Separator::COMMA => num.separate_with_commas(),
+//             Separator::DOT => num.separate_with_dots(),
+//             Separator::SPACE => num.separate_with_spaces(),
+//         }
+//     }
 
-    /// Apply the format option to the decimal part (which is currently manipulated as a whole integer)
-    pub fn apply_decimal_format(
-        decimal_part: i32,
-        options: FormatOption,
-    ) -> String {
-        let decimal_len = decimal_part.to_string().len() as u8;
+//     /// Apply the format option to the decimal part (which is currently manipulated as a whole integer)
+//     pub fn apply_decimal_format(
+//         decimal_part: i32,
+//         options: FormatOption,
+//     ) -> String {
+//         let decimal_len = decimal_part.to_string().len() as u8;
 
-        if decimal_len < options.minimum_fraction_digit {
-            return (decimal_part
-                * 10_i32.pow((options.minimum_fraction_digit - decimal_len) as u32))
-            .to_string();
-        }
+//         if decimal_len < options.minimum_fraction_digit {
+//             return (decimal_part
+//                 * 10_i32.pow((options.minimum_fraction_digit - decimal_len) as u32))
+//             .to_string();
+//         }
 
-        if decimal_len > options.maximum_fraction_digit {
-            return (decimal_part
-                / 10i32.pow((decimal_len - options.minimum_fraction_digit) as u32))
-            .to_string();
-        }
+//         if decimal_len > options.maximum_fraction_digit {
+//             return (decimal_part
+//                 / 10i32.pow((decimal_len - options.minimum_fraction_digit) as u32))
+//             .to_string();
+//         }
 
-        decimal_part.to_string()
-    }
+//         decimal_part.to_string()
+//     }
 
-    pub fn to_format_options(
-        &self,
-        culture: &Culture,
-        format: FormatOption,
-    ) -> Result<String, ConversionError> {
-        let (sign_string, whole_string, decimal_opt_string) = self.regex_read_number()?;
+//     pub fn to_format_options(
+//         &self,
+//         culture: &Culture,
+//         format: FormatOption,
+//     ) -> Result<String, ConversionError> {
+//         let (sign_string, whole_string, decimal_opt_string) = self.regex_read_number()?;
 
-        let mut number_string = Number::<T>::apply_thousand_separator(
-            ConvertString::new(format!("{}{}", sign_string, whole_string).as_str(), None)
-                .to_integer()
-                .unwrap()
-                .num,
-            culture,
-        );
+//         let mut number_string = Number::<T>::apply_thousand_separator(
+//             ConvertString::new(format!("{}{}", sign_string, whole_string).as_str(), None)
+//                 .to_integer()
+//                 .unwrap()
+//                 .num,
+//             culture,
+//         );
 
-        if let Some(decimal_string) = decimal_opt_string {
-            let decimal_part = ConvertString::new(decimal_string.as_str(), None)
-                .to_integer()
-                .unwrap()
-                .num;
+//         if let Some(decimal_string) = decimal_opt_string {
+//             let decimal_part = ConvertString::new(decimal_string.as_str(), None)
+//                 .to_integer()
+//                 .unwrap()
+//                 .num;
 
-            number_string = format!(
-                "{}{}{}",
-                number_string,
-                NumberCultureSettings::from(*culture).decimal_separator,
-                Number::<T>::apply_decimal_format(decimal_part, format)
-            );
-        }
+//             number_string = format!(
+//                 "{}{}{}",
+//                 number_string,
+//                 NumberCultureSettings::from(*culture).decimal_separator,
+//                 Number::<T>::apply_decimal_format(decimal_part, format)
+//             );
+//         }
 
-        Ok(number_string)
-    }
-}
-impl<T: num::Num + Display> PartialEq<T> for Number<T> {
-    fn eq(&self, other: &T) -> bool {
-        &self.num == other
-    }
-}
+//         Ok(number_string)
+//     }
+// }
+// impl<T: num::Num + Display> PartialEq<T> for Number<T> {
+//     fn eq(&self, other: &T) -> bool {
+//         &self.num == other
+//     }
+// }
 
-impl<T: num::Num + Display> Display for Number<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.num)
-    }
-}
+// impl<T: num::Num + Display> Display for Number<T> {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "{}", &self.num)
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
