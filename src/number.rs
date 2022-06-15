@@ -1,15 +1,27 @@
-use crate::ConvertString;
-use thousands::Separable;
-use crate::NumberCultureSettings;
-use crate::FormatOption;
-use crate::Culture;
-use crate::Regex;
-use crate::ConversionError;
+use crate::number_conversion::NumberConversion;
 use crate::pattern::Separator;
+use crate::ConversionError;
+use crate::ConvertString;
+use crate::Culture;
+use crate::FormatOption;
+use crate::NumberCultureSettings;
+use crate::Regex;
 use log::error;
 use log::trace;
 use num::Num;
 use std::fmt::Display;
+use thousands::Separable;
+
+pub trait ToFormat {
+    fn to_format(self, format: &str, culture: &Culture) -> Result<String, ConversionError>;
+}
+
+impl ToFormat for i32 {
+    fn to_format(self, digit: &str, culture: &Culture) -> Result<String, ConversionError> {
+        let nb_digit = Number::<i32>::set_nb_digits(digit)?;
+        Number::<i32>::new(self).to_format_options(culture, FormatOption::new(nb_digit, nb_digit))
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Number<T: Num + Display> {
@@ -60,6 +72,19 @@ impl<T: num::Num + Display> Number<T> {
         ))
     }
 
+    fn set_nb_digits(digit: &str) -> Result<u8, ConversionError> {
+        if digit.len() != 2 {
+            return Err(ConversionError::UnableToDisplayFormat);
+        }
+
+        let chars: Vec<char> = digit.chars().collect();
+        if chars[0] != "N".chars().next().unwrap() {
+            return Err(ConversionError::UnableToDisplayFormat);
+        }
+
+        Ok(chars[1].to_string().as_str().to_number::<u8>()?)
+    }
+
     /// Return number to the current default culture format
     pub fn to_format(&self, culture: &Culture) -> Result<String, ConversionError> {
         self.to_format_options(culture, FormatOption::new(2, 2))
@@ -75,10 +100,7 @@ impl<T: num::Num + Display> Number<T> {
     }
 
     /// Apply the format option to the decimal part (which is currently manipulated as a whole integer)
-    pub fn apply_decimal_format(
-        decimal_part: i32,
-        options: FormatOption,
-    ) -> String {
+    pub fn apply_decimal_format(decimal_part: i32, options: FormatOption) -> String {
         let decimal_len = decimal_part.to_string().len() as u8;
 
         if decimal_len < options.minimum_fraction_digit {
@@ -140,13 +162,12 @@ impl<T: num::Num + Display> Display for Number<T> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
+    use crate::number::ToFormat;
 
     #[test]
-    pub fn test_to_format() {
-        
+    pub fn str_to_format() {
+        assert_eq!(10000_i32.to_format("N0", &crate::Culture::French).unwrap(), "10 000");
     }
 }
-
