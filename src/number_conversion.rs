@@ -2,6 +2,7 @@ use crate::Culture;
 use crate::Num;
 use std::{fmt::Display, str::FromStr};
 
+use log::info;
 use log::{trace, warn};
 use regex::Regex;
 
@@ -86,6 +87,10 @@ impl StringNumber {
 
     /// Create regex from struct to clean the string
     pub fn clean(&self) -> String {
+        info!(
+            "Clean with string input = {} and separators = {:?}",
+            &self.value, &self.number_culture_settings
+        );
         let mut string_value = self.value.clone();
 
         // Shortcut closure to call replace_element function
@@ -184,7 +189,7 @@ impl NumberConversion for StringNumber {
         Ok(self
             .clean()
             .parse::<N>()
-            .map_err(|e| ConversionError::UnableToConvertStringToNumber)?)
+            .map_err(|_e| ConversionError::UnableToConvertStringToNumber)?)
     }
 
     fn to_number_separators<N>(
@@ -236,9 +241,21 @@ mod tests {
         number_conversion::{FloatConversion, IntegerConversion, NumberConversion, StringNumber},
         pattern::{NumberCultureSettings, Separator},
     };
+    use std::str::FromStr;
 
+    fn DOT_COMMA() -> NumberCultureSettings {
+        NumberCultureSettings::from((".", ","))
+    }
+    fn COMMA_DOT() -> NumberCultureSettings {
+        NumberCultureSettings::from((",", "."))
+    }
+    fn SPACE_COMMA() -> NumberCultureSettings {
+        NumberCultureSettings::from((" ", ","))
+    }
+    
+    /// Simple integer conversion
     #[test]
-    fn number_conversion_whole() {
+    fn number_conversion_integer() {
         let list = vec![
             ("10", 10, 10.0),
             ("0", 0, 0.0),
@@ -253,92 +270,127 @@ mod tests {
         }
     }
 
+    /// Simple decimal conversion
     #[test]
     fn number_conversion_decimal() {
         let list = vec![
-            ("10,0", 10, 10.0),
-            ("0,25", 0, 0.25),
-            ("-10,5", -10, -10.5),
-            ("1000,89", 1000, 1000.89),
-            ("1 000,4564654654654", 1000, 1000.4564654654654),
-            ("1000,4564654654654", 1000, 1000.4564654654654),
+            ("10,0", 10.0),
+            ("0,25", 0.25),
+            ("-10,5", -10.5),
+            ("1000,89", 1000.89),
+            ("1 000,4564654654654", 1000.4564654654654),
+            ("1000,4564654654654", 1000.4564654654654),
         ];
 
-        for (string_value, int_value, float_value) in list {
+        for (string_value, float_value) in list {
             assert_eq!(
                 string_value
-                    .to_number_separators::<i32>(NumberCultureSettings::from(("", ",")))
-                    .unwrap(),
-                int_value
-            );
-            assert_eq!(
-                string_value
-                    .to_number_separators::<f64>(NumberCultureSettings::from(("", ",")))
+                    .to_number_separators::<f64>(NumberCultureSettings::from((" ", ",")))
                     .unwrap(),
                 float_value
             );
-
-            // let wn = StringNumber::new_with_settings(
-            //     String::from(string_value),
-            //     NumberCultureSettings::from(("", ",")),
-            // );
-
-            // let int_conversion = wn.to_integer().expect(
-            //     format!(
-            //         "{} string couldn't been converted to integer",
-            //         wn.value.to_string()
-            //     )
-            //     .as_str(),
-            // );
-            // assert_eq!(int_conversion.num, int_value);
-
-            // let float_conversion = wn.to_float().expect(
-            //     format!(
-            //         "{} string couldn't been converted to float",
-            //         wn.value.to_string()
-            //     )
-            //     .as_str(),
-            // );
-            // assert_eq!(float_conversion.num, float_value);
         }
     }
 
+    /// Conversion with several thousand and decimal separator
     #[test]
     fn number_conversion_others() {
-        let wn = StringNumber::new_with_settings(
-            String::from("10.000.000"),
-            NumberCultureSettings::from((".", ",")),
+        assert_eq!(
+            "10.000.000"
+                .to_number_separators::<i32>(DOT_COMMA())
+                .unwrap(),
+            10_000_000
         );
-        assert_eq!(wn.to_integer().unwrap(), 10_000_000);
 
-        let wn = StringNumber::new_with_settings(
-            String::from("10,000,000"),
-            NumberCultureSettings::from((",", ".")),
+        assert_eq!(
+            "10,000,000"
+                .to_number_separators::<i32>(COMMA_DOT())
+                .unwrap(),
+            10_000_000
         );
-        assert_eq!(wn.to_integer().unwrap(), 10_000_000);
 
-        let wn = StringNumber::new_with_settings(
-            String::from("10,000,000"),
-            NumberCultureSettings::from((" ", ",")),
+        assert_eq!(
+            "1.000,45"
+                .to_number_separators::<f64>(DOT_COMMA())
+                .unwrap(),
+            1_000.45
+        );
+
+        assert_eq!(
+            "1.000"
+                .to_number_separators::<i32>(DOT_COMMA())
+                .unwrap(),
+            1_000
+        );
+    }
+
+    /// Conversion with i8 primitive
+    #[test]
+    fn number_conversion_primitive_dependent_i8() {
+        /* Reminder : 
+        * i8 : [-128: 128]
+        */
+
+        let i8_ok = "120";
+        assert_eq!(
+            i8_ok
+                .to_number::<i8>()
+                .unwrap(),
+            120
         );
         assert_eq!(
-            wn.to_integer(),
+            i8_ok
+                .to_number::<i64>()
+                .unwrap(),
+            120
+        );
+        assert_eq!(
+            i8_ok
+                .to_number::<u8>()
+                .unwrap(),
+            120
+        );
+    }
+
+    /// Conversion with i16 primitive
+    #[test]
+    fn number_conversion_primitive_dependent_i16() {
+        /* Reminder : 
+        * i16 : [-32768: 32768]
+        */
+        let i16_ok = "-10000";
+        assert_eq!(
+            i16_ok
+                .to_number::<i16>()
+                .unwrap(),
+            -10_000
+        );
+
+        assert_eq!(
+            i16_ok.to_number::<i8>(),
+            Err(ConversionError::UnableToConvertStringToNumber)
+        );
+    }
+    
+    #[test]
+    fn number_error_conversion() {
+        assert_eq!(
+            "10,000,000"
+                .to_number_separators::<i32>(SPACE_COMMA()),
             Err(ConversionError::UnableToConvertStringToNumber)
         );
 
-        let wn = StringNumber::new_with_settings(
-            String::from("1.000,45"),
-            NumberCultureSettings::from((".", ",")),
+        assert_eq!(
+            "10,00,00,00"
+                .to_number_separators::<i32>(SPACE_COMMA()),
+            Err(ConversionError::UnableToConvertStringToNumber)
         );
-        assert_eq!(wn.to_float().unwrap(), 1_000.45);
-
-        let wn = StringNumber::new_with_settings(
-            String::from("1.000"),
-            NumberCultureSettings::from((".", ",")),
+        assert_eq!(
+            "10,00,00,00"
+                .to_number::<i32>(),
+            Err(ConversionError::UnableToConvertStringToNumber)
         );
-        assert_eq!(wn.to_float().unwrap(), 1_000.0);
     }
-
     #[test]
     fn number_conversion_not_allowed() {
         let list = vec!["x", "10*5", "2..500"];

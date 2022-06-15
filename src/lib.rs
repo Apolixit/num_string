@@ -552,7 +552,6 @@ mod tests {
         }
     }
 
-    #[test]
     pub fn test_number_to_format_explicit_float() {
         let floats = vec![
             (2_000.98, Culture::English, "2,000", FormatOption::new(0, 0)),
