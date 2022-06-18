@@ -298,7 +298,7 @@ impl Default for FormatOption {
 
 #[cfg(test)]
 mod tests {
-    use crate::{pattern::NumberType, ConvertString, Culture, FormatOption, Number};
+    use crate::{pattern::NumberType, ConvertString, Culture, FormatOption, Number, number::ToFormat};
     use log::{info, warn};
     use regex::Regex;
     use thousands::Separable;
@@ -516,7 +516,7 @@ mod tests {
 
         for (number, culture, to_string_format) in integers {
             assert_eq!(
-                Number::new(number).to_format(&culture).unwrap(),
+                number.to_format("N0", &culture).unwrap(),
                 String::from(to_string_format)
             );
         }
@@ -532,90 +532,76 @@ mod tests {
 
         for (number, culture, to_string_format) in floats {
             assert_eq!(
-                Number::new(number).to_format(&culture).unwrap(),
+                number.to_format("N2", &culture).unwrap(),
                 String::from(to_string_format)
             );
         }
     }
 
-    pub fn test_number_to_format_explicit_float() {
-        let floats = vec![
-            (2_000.98, Culture::English, "2,000", FormatOption::new(0, 0)),
-            (-2_000.98, Culture::French, "-2 000,9", FormatOption::new(0, 1)),
-            (2_000.98, Culture::Italian, "2.000,98", FormatOption::new(0, 5)),
-            (2_000.98, Culture::Italian, "2.000,98000", FormatOption::new(5, 5)),
-        ];
+    
 
-        for (number, culture, to_string_format, format) in floats {
-            assert_eq!(
-                Number::new(number).to_format_options(&culture, format).unwrap(),
-                String::from(to_string_format)
-            );
-        }
-    }
+    // #[test]
+    // fn test_test() {
+    //     let int = 1000;
+    //     let float = 1000.32;
+    //     let zob = int.separate_with_commas();
+    //     assert_eq!(int.separate_with_commas(), "1,000".to_owned());
 
-    #[test]
-    fn test_test() {
-        let int = 1000;
-        let float = 1000.32;
-        let zob = int.separate_with_commas();
-        assert_eq!(int.separate_with_commas(), "1,000".to_owned());
+    //     let val = "1000.32";
+    //     assert_eq!(float.to_string(), val);
 
-        let val = "1000.32";
-        assert_eq!(float.to_string(), val);
+    //     let regex = Regex::new(r"([0-9]+)([\.])([0-9]+)").unwrap();
+    //     let capture = regex.captures(val).unwrap();
+    //     info!("Hehe {:?}", capture);
 
-        let regex = Regex::new(r"([0-9]+)([\.])([0-9]+)").unwrap();
-        let capture = regex.captures(val).unwrap();
-        info!("Hehe {:?}", capture);
+    //     assert_eq!(capture.get(3).unwrap().as_str(), "32");
 
-        assert_eq!(capture.get(3).unwrap().as_str(), "32");
+    //     let decimal_len = "32".len();
+    //     let whole_part = ConvertString::new(capture.get(1).unwrap().as_str(), None)
+    //         .to_integer()
+    //         .unwrap()
+    //         .num;
+    //     let decimal_part = ConvertString::new(capture.get(3).unwrap().as_str(), None)
+    //         .to_integer()
+    //         .unwrap()
+    //         .num;
+    //     assert_eq!(2, decimal_len);
+    //     assert_eq!(1000, whole_part);
+    //     assert_eq!(32, decimal_part);
+    //     let to_float_decimal_part = decimal_part as f32 / 10_i32.pow(decimal_len as u32) as f32;
+    //     assert_eq!(0.32, to_float_decimal_part);
 
-        let decimal_len = "32".len();
-        let whole_part = ConvertString::new(capture.get(1).unwrap().as_str(), None)
-            .to_integer()
-            .unwrap()
-            .num;
-        let decimal_part = ConvertString::new(capture.get(3).unwrap().as_str(), None)
-            .to_integer()
-            .unwrap()
-            .num;
-        assert_eq!(2, decimal_len);
-        assert_eq!(1000, whole_part);
-        assert_eq!(32, decimal_part);
-        let to_float_decimal_part = decimal_part as f32 / 10_i32.pow(decimal_len as u32) as f32;
-        assert_eq!(0.32, to_float_decimal_part);
+    //     let to_final_string = format!(
+    //         "{}{}{}",
+    //         whole_part.separate_with_spaces(),
+    //         ",",
+    //         decimal_part
+    //     );
+    //     assert_eq!("1 000,32", to_final_string);
 
-        let to_final_string = format!(
-            "{}{}{}",
-            whole_part.separate_with_spaces(),
-            ",",
-            decimal_part
-        );
-        assert_eq!("1 000,32", to_final_string);
+    //     // let x1 = 1000.32;
+    //     // let x2 = 1000;
+    //     // let x3 = x1 - x2 as f64;
+    //     // assert_eq!(x3, 0.32);
+    //     // assert_eq!(x3.to_string(), "0.32");
+    //     // assert_eq!(1000.32.trunc() as i32, 1000);
+    //     // assert_eq!(1000.99 as i32, 1000);
+    //     // let mut writer = String::new();
+    //     // let format = CustomFormat::builder()
+    //     //     .grouping(Grouping::Standard)
+    //     //     .separator(" ")
+    //     //     .decimal(",")
+    //     //     .build()?;
+    //     // 10.to_formatted_string(&culture.to_local());
+    //     // let mut buf = Buffer::new();
+    //     // buf.write_formatted(&10, &format);
+    //     // buf.write_formatted(&10.2, &format);
+    //     // let f = 10.0;
 
-        // let x1 = 1000.32;
-        // let x2 = 1000;
-        // let x3 = x1 - x2 as f64;
-        // assert_eq!(x3, 0.32);
-        // assert_eq!(x3.to_string(), "0.32");
-        // assert_eq!(1000.32.trunc() as i32, 1000);
-        // assert_eq!(1000.99 as i32, 1000);
-        // let mut writer = String::new();
-        // let format = CustomFormat::builder()
-        //     .grouping(Grouping::Standard)
-        //     .separator(" ")
-        //     .decimal(",")
-        //     .build()?;
-        // 10.to_formatted_string(&culture.to_local());
-        // let mut buf = Buffer::new();
-        // buf.write_formatted(&10, &format);
-        // buf.write_formatted(&10.2, &format);
-        // let f = 10.0;
-
-        // f.0.to_formatted_string(&culture.to_local());
-        // writer.write_formatted(&self.num, &culture.to_local()).map_err(|e| ConversionError::UnableToDisplayFormat)?;
-        // Ok(writer)
-    }
+    //     // f.0.to_formatted_string(&culture.to_local());
+    //     // writer.write_formatted(&self.num, &culture.to_local()).map_err(|e| ConversionError::UnableToDisplayFormat)?;
+    //     // Ok(writer)
+    // }
 }
 
 // macro_rules! impl_from {
