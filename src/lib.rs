@@ -298,7 +298,8 @@ impl Default for FormatOption {
 
 #[cfg(test)]
 mod tests {
-    use crate::{pattern::NumberType, ConvertString, Culture, FormatOption, Number, number::ToFormat};
+    use num::Num;
+use crate::{pattern::NumberType, ConvertString, Culture, FormatOption, Number, number::ToFormat, number_conversion::NumberConversion};
     use log::{info, warn};
     use regex::Regex;
     use thousands::Separable;
@@ -307,6 +308,30 @@ mod tests {
     #[ctor::ctor]
     fn init() {
         env_logger::init();
+    }
+
+    #[test]
+    fn test_reverse_mapping_number()
+    {
+        let values_int = vec![
+            (1, "1", Culture::French),
+            (1000, "1 000", Culture::French)
+        ];
+
+        for (val_i32, val_str, culture) in values_int {
+            assert_eq!(val_i32.to_format("N0", &culture).unwrap(), val_str);
+            assert_eq!(val_str.to_number_culture::<i32>(culture).unwrap(), val_i32);
+        }
+
+        let values_float = vec![
+            (1.0, "1,00", Culture::French),
+            (1000.88, "1 000,88", Culture::French)
+        ];
+
+        for (val_f64, val_str, culture) in values_float {
+            assert_eq!(val_f64.to_format("N2", &culture).unwrap(), val_str);
+            assert_eq!(val_str.to_number_culture::<f64>(culture).unwrap(), val_f64);
+        }
     }
 
     #[test]
@@ -477,33 +502,6 @@ mod tests {
     }
 
     #[test]
-    fn test_split_number() {
-        assert_eq!(
-            Number::new(1_000.32f32).regex_read_number().unwrap(),
-            ("+".to_owned(), "1000".to_owned(), Some("32".to_owned())),
-            "Error when spliting 1_000.32f32"
-        );
-
-        assert_eq!(
-            Number::new(-1_000_000.32f64).regex_read_number().unwrap(),
-            ("-".to_owned(), "1000000".to_owned(), Some("32".to_owned())),
-            "Error when spliting -1_000_000.32f64"
-        );
-
-        assert_eq!(
-            Number::new(-1_000i32).regex_read_number().unwrap(),
-            ("-".to_owned(), "1000".to_owned(), None),
-            "Error when spliting -1_000i32"
-        );
-
-        assert_eq!(
-            Number::new(2).regex_read_number().unwrap(),
-            ("+".to_owned(), "2".to_owned(), None),
-            "Error when spliting 2"
-        );
-    }
-
-    #[test]
     pub fn test_number_to_format_integer() {
         let integers = vec![
             (2000i64, Culture::English, "2,000"),
@@ -528,6 +526,7 @@ mod tests {
             (2_000.98, Culture::English, "2,000.98"),
             (-2_000.98, Culture::French, "-2 000,98"),
             (2_000.98, Culture::Italian, "2.000,98"),
+            (049_490.8257, Culture::English, "49,490.83"),
         ];
 
         for (number, culture, to_string_format) in floats {
@@ -537,71 +536,6 @@ mod tests {
             );
         }
     }
-
-    
-
-    // #[test]
-    // fn test_test() {
-    //     let int = 1000;
-    //     let float = 1000.32;
-    //     let zob = int.separate_with_commas();
-    //     assert_eq!(int.separate_with_commas(), "1,000".to_owned());
-
-    //     let val = "1000.32";
-    //     assert_eq!(float.to_string(), val);
-
-    //     let regex = Regex::new(r"([0-9]+)([\.])([0-9]+)").unwrap();
-    //     let capture = regex.captures(val).unwrap();
-    //     info!("Hehe {:?}", capture);
-
-    //     assert_eq!(capture.get(3).unwrap().as_str(), "32");
-
-    //     let decimal_len = "32".len();
-    //     let whole_part = ConvertString::new(capture.get(1).unwrap().as_str(), None)
-    //         .to_integer()
-    //         .unwrap()
-    //         .num;
-    //     let decimal_part = ConvertString::new(capture.get(3).unwrap().as_str(), None)
-    //         .to_integer()
-    //         .unwrap()
-    //         .num;
-    //     assert_eq!(2, decimal_len);
-    //     assert_eq!(1000, whole_part);
-    //     assert_eq!(32, decimal_part);
-    //     let to_float_decimal_part = decimal_part as f32 / 10_i32.pow(decimal_len as u32) as f32;
-    //     assert_eq!(0.32, to_float_decimal_part);
-
-    //     let to_final_string = format!(
-    //         "{}{}{}",
-    //         whole_part.separate_with_spaces(),
-    //         ",",
-    //         decimal_part
-    //     );
-    //     assert_eq!("1 000,32", to_final_string);
-
-    //     // let x1 = 1000.32;
-    //     // let x2 = 1000;
-    //     // let x3 = x1 - x2 as f64;
-    //     // assert_eq!(x3, 0.32);
-    //     // assert_eq!(x3.to_string(), "0.32");
-    //     // assert_eq!(1000.32.trunc() as i32, 1000);
-    //     // assert_eq!(1000.99 as i32, 1000);
-    //     // let mut writer = String::new();
-    //     // let format = CustomFormat::builder()
-    //     //     .grouping(Grouping::Standard)
-    //     //     .separator(" ")
-    //     //     .decimal(",")
-    //     //     .build()?;
-    //     // 10.to_formatted_string(&culture.to_local());
-    //     // let mut buf = Buffer::new();
-    //     // buf.write_formatted(&10, &format);
-    //     // buf.write_formatted(&10.2, &format);
-    //     // let f = 10.0;
-
-    //     // f.0.to_formatted_string(&culture.to_local());
-    //     // writer.write_formatted(&self.num, &culture.to_local()).map_err(|e| ConversionError::UnableToDisplayFormat)?;
-    //     // Ok(writer)
-    // }
 }
 
 // macro_rules! impl_from {

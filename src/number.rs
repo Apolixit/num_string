@@ -14,10 +14,17 @@ use std::fmt::format;
 use std::fmt::Display;
 use thousands::Separable;
 
+/// Trait to display a number with 'to_format' function
+/// The format parameter is like C# toString() function with N0 / N2 / N4 values
+/// N0 display 0 digit, N2 two digit, N4 four digit etc.
+/// The max is N9 digit
+/// And the culture parameter is use to display with the selected culture (it automatically
+/// apply the thousand and decimal separator of the given culture)
 pub trait ToFormat {
     fn to_format(self, format: &str, culture: &Culture) -> Result<String, ConversionError>;
 }
 
+/// Implement the trait for all primitive (i8, i64, u32, f32 etc.), thanks to Num trait
 impl<T> ToFormat for T
 where
     T: Num + Display,
@@ -28,6 +35,7 @@ where
     }
 }
 
+/// A wrapper structure to perform the 'to_format' trait
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Number<T: Num + Display> {
     pub num: T,
@@ -47,6 +55,7 @@ impl<T: num::Num + Display> Number<T> {
     pub fn regex_read_number(&self) -> Result<(String, String, Option<String>), ConversionError> {
         let str = &self.num.to_string();
 
+        // Regex to split the current number
         let regex = Regex::new(r"([\-\+]?)([0-9]+)([\.]?)([0-9]*)").map_err(|e| {
             error!("{:?}", e);
             return ConversionError::UnableToConvertNumberToString;
@@ -77,6 +86,10 @@ impl<T: num::Num + Display> Number<T> {
         ))
     }
 
+    /// Return the number of digit pass in str parameter.
+    /// Split the 'Nx' from the to_format trait
+    /// Allowed values : N0, N1, N2, N3, N4, N5, N6, N7, N8, N9
+    /// Ref test_set_nb_digits
     fn set_nb_digits(digit: &str) -> Result<u8, ConversionError> {
         if digit.len() != 2 {
             return Err(ConversionError::UnableToDisplayFormat);
@@ -91,10 +104,13 @@ impl<T: num::Num + Display> Number<T> {
     }
 
     /// Return number to the current default culture format
-    pub fn to_format(&self, culture: &Culture) -> Result<String, ConversionError> {
-        self.to_format_options(culture, FormatOption::new(2, 2))
-    }
+    // pub fn to_format(&self, culture: &Culture) -> Result<String, ConversionError> {
+    //     self.to_format_options(culture, FormatOption::new(2, 2))
+    // }
 
+    /// Apply the thousand separator to the whole number given in parameter
+    /// Thanks to thousands crate 
+    /// Ref 'test_apply_thousand_separator'
     fn apply_thousand_separator(num: i32, culture: &Culture) -> String {
         let culture_settings = NumberCultureSettings::from(*culture);
         match culture_settings.to_thousand_separator() {
@@ -105,12 +121,15 @@ impl<T: num::Num + Display> Number<T> {
     }
 
     /// Apply the format option to the decimal part (which is currently manipulated as a whole integer)
-    pub fn apply_decimal_format(decimal_part: i32, options: FormatOption) -> Option<String> {
+    /// This function sucks, todo refacto later
+    /// Ref 'test_apply_decimal'
+    pub fn apply_decimal_format(decimal_part: i32, options: FormatOption) -> Option<(String, bool)> {
         if options.minimum_fraction_digit == 0 {
             return None;
         }
 
-        let decimal_len = decimal_part.to_string().len() as u8;
+        let decimal_string = decimal_part.to_string();
+        let decimal_len = decimal_string.len() as u8;
 
         if decimal_len < options.minimum_fraction_digit {
             trace!(
@@ -118,11 +137,11 @@ impl<T: num::Num + Display> Number<T> {
                 decimal_len,
                 options.minimum_fraction_digit
             );
-            return Some(format!(
+            return Some((format!(
                 "{}{}",
                 decimal_part,
                 "0".repeat(options.minimum_fraction_digit as usize - decimal_len as usize)
-            ));
+            ), false));
         }
 
         if decimal_len > options.maximum_fraction_digit {
@@ -131,8 +150,16 @@ impl<T: num::Num + Display> Number<T> {
                 decimal_len,
                 options.maximum_fraction_digit
             );
-            let exp = 10i32.pow((decimal_len - options.minimum_fraction_digit) as u32) as f64;
-            return Some((((decimal_part as f64) / exp).round() as u128).to_string());
+            //Check if we need to round the whole part
+            let decimal_rounded = decimal_part as f64 / (10i32.pow(decimal_len as u32 - options.maximum_fraction_digit as u32) as f64); 
+            if decimal_rounded.round() as u32 == 10u32.pow(options.maximum_fraction_digit as u32) {
+                trace!("Need to round the whole part up");
+                return Some(("0".repeat(options.maximum_fraction_digit as usize), true));
+            }
+
+            let exp = 10i32.pow((decimal_len - options.maximum_fraction_digit) as u32) as f64;
+            let calc = ((decimal_part as f64) / exp).round() as u128;
+            return Some((calc.to_string(), false));
         }
 
         trace!(
@@ -140,9 +167,11 @@ impl<T: num::Num + Display> Number<T> {
             decimal_len,
             options.minimum_fraction_digit
         );
-        Some(decimal_part.to_string())
+        Some((decimal_part.to_string(), false))
     }
 
+    /// Main function
+    /// Apply the format to the number
     pub fn to_format_options(
         &self,
         culture: &Culture,
@@ -150,7 +179,7 @@ impl<T: num::Num + Display> Number<T> {
     ) -> Result<String, ConversionError> {
         trace!("format = {:?}", format);
         let (sign_string, whole_string, decimal_opt_string) = self.regex_read_number()?;
-        // warn!("Whole string = {}", whole_string);
+        
         let calc_to_string = |sign_string, whole_string| -> String {
             Number::<T>::apply_thousand_separator(
                 ConvertString::new(format!("{}{}", sign_string, whole_string).as_str(), None)
@@ -171,8 +200,15 @@ impl<T: num::Num + Display> Number<T> {
 
         trace!("Decimal part : {}", decimal_part);
         let decimal_opt = Number::<T>::apply_decimal_format(decimal_part, format);
-        if let Some(decimal_format) = decimal_opt {
-            number_string = calc_to_string(sign_string, whole_string);
+        if let Some((decimal_format, need_round_up_whole_part)) = decimal_opt {
+            if need_round_up_whole_part {
+                number_string = calc_to_string(
+                    sign_string,
+                    (whole_string.as_str().to_number::<u64>().unwrap() + 1).to_string(),
+                );
+            } else {
+                number_string = calc_to_string(sign_string, whole_string);
+            }
 
             number_string = format!(
                 "{}{}{}",
@@ -185,8 +221,6 @@ impl<T: num::Num + Display> Number<T> {
             let whole_number = whole_string.as_str().to_number::<u64>().unwrap();
 
             let exp = 10i32.pow(decimal_part.to_string().len() as u32) as f64;
-            // whole_string =
-            //     (whole_number + (((decimal_part as f64) / exp).round() as u64)).to_string();
 
             number_string = calc_to_string(
                 sign_string,
@@ -197,6 +231,7 @@ impl<T: num::Num + Display> Number<T> {
         Ok(number_string)
     }
 }
+
 impl<T: num::Num + Display> PartialEq<T> for Number<T> {
     fn eq(&self, other: &T) -> bool {
         &self.num == other
@@ -211,12 +246,10 @@ impl<T: num::Num + Display> Display for Number<T> {
 
 #[cfg(test)]
 mod tests {
-    use log::trace;
-
-    use crate::{number::ToFormat, Culture, FormatOption};
-
+    use crate::{number::ToFormat, Culture, FormatOption, errors::ConversionError};
     use super::Number;
 
+    /// Test of 'to_format' function to display number to string with integer values
     #[test]
     pub fn str_to_format_integer() {
         let vals_i32 = vec![
@@ -265,6 +298,7 @@ mod tests {
         }
     }
 
+    /// Test of 'to_format' function to display number to string with float values
     #[test]
     pub fn str_to_format_float() {
         let vals_f64 = vec![
@@ -274,6 +308,10 @@ mod tests {
             (-1000.98, "N0", Culture::Italian, "-1.001"),
             (-1000.66666, "N3", Culture::Italian, "-1.000,667"),
             (1., "N2", Culture::English, "1.00"),
+            (2_000.98, "N0",  Culture::Italian, "2.001"),
+            (2_000.98, "N2",  Culture::Italian, "2.000,98"),
+            (2_000.98, "N3",  Culture::Italian, "2.000,980"),
+            (2_000.9998888, "N3",  Culture::Italian, "2.001,000"),
         ];
 
         for (val_f64, to_format, culture, string_result) in vals_f64 {
@@ -284,6 +322,7 @@ mod tests {
         }
     }
 
+    /// Test of 'apply_decimal_format' function
     #[test]
     pub fn test_apply_decimal() {
         let list = vec![
@@ -294,20 +333,21 @@ mod tests {
             (512, FormatOption::new(5, 5), "51200"),
         ];
 
-        for (num, format, string_num) in list {
+        for (decimal_value, format, decimal_string) in list {
             assert_eq!(
-                Number::<i32>::apply_decimal_format(num, format).unwrap(),
-                string_num
+                Number::<i32>::apply_decimal_format(decimal_value, format).unwrap().0,
+                decimal_string
             );
         }
     }
 
+    /// Test of 'to_format_options' function with float number
     #[test]
-    pub fn test_number_to_format_explicit_float() {
+    pub fn test_number_to_format_option_float() {
         let floats = vec![
-            (2_000.98, Culture::English, "2,001", FormatOption::new(0, 0)),
-            (-2_000.98, Culture::French, "-2 001,0", FormatOption::new(0, 1)),
-            (2_000.98, Culture::Italian, "2.000,98", FormatOption::new(0, 5)),
+            (2_000.98, Culture::English, "2,001", FormatOption::new(0, 2)),
+            (-2_000.98, Culture::French, "-2 001", FormatOption::new(0, 0)),
+            (2_000.98, Culture::Italian, "2.000,980", FormatOption::new(3, 5)),
             (2_000.98, Culture::Italian, "2.000,98000", FormatOption::new(5, 5)),
         ];
 
@@ -316,6 +356,76 @@ mod tests {
                 Number::new(number).to_format_options(&culture, format).unwrap(),
                 String::from(to_string_format)
             );
+        }
+    }
+
+    /// Test the 'regex_read_number' function
+    #[test]
+    fn test_split_number() {
+        assert_eq!(
+            Number::new(1_000.32f32).regex_read_number().unwrap(),
+            ("+".to_owned(), "1000".to_owned(), Some("32".to_owned())),
+            "Error when spliting 1_000.32f32"
+        );
+
+        assert_eq!(
+            Number::new(-1_000_000.32f64).regex_read_number().unwrap(),
+            ("-".to_owned(), "1000000".to_owned(), Some("32".to_owned())),
+            "Error when spliting -1_000_000.32f64"
+        );
+
+        assert_eq!(
+            Number::new(-1_000i32).regex_read_number().unwrap(),
+            ("-".to_owned(), "1000".to_owned(), None),
+            "Error when spliting -1_000i32"
+        );
+
+        assert_eq!(
+            Number::new(2).regex_read_number().unwrap(),
+            ("+".to_owned(), "2".to_owned(), None),
+            "Error when spliting 2"
+        );
+    }
+
+    /// The the 'set_nb_digits' function
+    #[test]
+    fn test_set_nb_digits() {
+        let values_ok = vec![
+            ("N0", 0),
+            ("N2", 2),
+            ("N4", 4),
+            ("N9", 9),
+        ];
+        let values_error = vec![
+            ("N10", ConversionError::UnableToDisplayFormat),
+            ("N200", ConversionError::UnableToDisplayFormat),
+            ("good morning", ConversionError::UnableToDisplayFormat),
+            ("Polkadot", ConversionError::UnableToDisplayFormat),
+        ];
+
+        for (format_str, result) in values_ok {
+            assert_eq!(Number::<i32>::set_nb_digits(format_str), Ok(result));
+        }
+
+        for (format_str, result) in values_error {
+            assert_eq!(Number::<i32>::set_nb_digits(format_str), Err(result));
+        }
+    }
+
+    /// The the 'apply_thousand_separator' function
+    #[test]
+    fn test_apply_thousand_separator() {
+        let values = vec![
+            (1000, Culture::French, "1 000"),
+            (-1000000, Culture::French, "-1 000 000"),
+            (1000, Culture::English, "1,000"),
+            (-1000000, Culture::English, "-1,000,000"),
+            (1000, Culture::Italian, "1.000"),
+            (-1000000, Culture::Italian, "-1.000.000"),
+        ];
+
+        for (val_i32, culture, val_string) in values {
+            assert_eq!(Number::<i32>::apply_thousand_separator(val_i32, &culture), val_string)
         }
     }
 }
