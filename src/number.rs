@@ -8,7 +8,9 @@ use crate::NumberCultureSettings;
 use crate::Regex;
 use log::error;
 use log::trace;
+use log::warn;
 use num::Num;
+use std::fmt::format;
 use std::fmt::Display;
 use thousands::Separable;
 
@@ -100,22 +102,42 @@ impl<T: num::Num + Display> Number<T> {
     }
 
     /// Apply the format option to the decimal part (which is currently manipulated as a whole integer)
-    pub fn apply_decimal_format(decimal_part: i32, options: FormatOption) -> String {
+    pub fn apply_decimal_format(decimal_part: i32, options: FormatOption) -> Option<String> {
+        if options.minimum_fraction_digit == 0 { return None; }
+
         let decimal_len = decimal_part.to_string().len() as u8;
 
         if decimal_len < options.minimum_fraction_digit {
-            return (decimal_part
-                * 10_i32.pow((options.minimum_fraction_digit - decimal_len) as u32))
-            .to_string();
+            trace!(
+                "The decimal part ({}) is smaller than the minimum_fraction_digit ({})",
+                decimal_len,
+                options.minimum_fraction_digit
+            );
+            return Some(format!(
+                "{}{}",
+                decimal_part,
+                "0".repeat(options.minimum_fraction_digit as usize - decimal_len as usize)
+            ));
         }
 
         if decimal_len > options.maximum_fraction_digit {
-            return (decimal_part
-                / 10i32.pow((decimal_len - options.minimum_fraction_digit) as u32))
-            .to_string();
+            trace!(
+                "The decimal part ({}) is greater than the maximum_fraction_digit ({})",
+                decimal_len,
+                options.maximum_fraction_digit
+            );
+            let exp = 10i32.pow((decimal_len - options.minimum_fraction_digit) as u32) as f64;
+            // let d = ((decimal_part as f64) / exp).round() as u128;
+            // warn!("decimal_part = {} / {} = {}", decimal_part, exp, d);
+            return Some((((decimal_part as f64) / exp).round() as u128).to_string());
         }
 
-        decimal_part.to_string()
+        trace!(
+            "The decimal part ({}) is equal to the minimum/maximum_fraction_digit ({})",
+            decimal_len,
+            options.minimum_fraction_digit
+        );
+        Some(decimal_part.to_string())
     }
 
     pub fn to_format_options(
@@ -123,6 +145,7 @@ impl<T: num::Num + Display> Number<T> {
         culture: &Culture,
         format: FormatOption,
     ) -> Result<String, ConversionError> {
+        trace!("format = {:?}", format);
         let (sign_string, whole_string, decimal_opt_string) = self.regex_read_number()?;
 
         let mut number_string = Number::<T>::apply_thousand_separator(
@@ -133,19 +156,23 @@ impl<T: num::Num + Display> Number<T> {
             culture,
         );
 
-        if let Some(decimal_string) = decimal_opt_string {
-            let decimal_part = ConvertString::new(decimal_string.as_str(), None)
-                .to_integer()
-                .unwrap()
-                .num;
+        // the decimal read by the previous regex or "0" if None
+        let decimal_string = decimal_opt_string.unwrap_or("0".to_owned());
+        let decimal_part = ConvertString::new(decimal_string.as_str(), None)
+            .to_integer()
+            .unwrap()
+            .num;
 
+        trace!("Decimal part : {}", decimal_part);
+        if let Some(decimal_format) = Number::<T>::apply_decimal_format(decimal_part, format) {
             number_string = format!(
                 "{}{}{}",
                 number_string,
                 NumberCultureSettings::from(*culture).decimal_separator,
-                Number::<T>::apply_decimal_format(decimal_part, format)
+                decimal_format
             );
         }
+        
 
         Ok(number_string)
     }
@@ -164,10 +191,46 @@ impl<T: num::Num + Display> Display for Number<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::number::ToFormat;
+    use log::trace;
+
+    use crate::{number::ToFormat, FormatOption, Culture};
+
+    use super::Number;
 
     #[test]
     pub fn str_to_format() {
-        assert_eq!(10000_i32.to_format("N0", &crate::Culture::French).unwrap(), "10 000");
+        let vals = vec![
+            (1000, "N0", Culture::French, "1 000"),
+            (10000, "N2", Culture::French, "10 000,00"),
+            (10000, "N4", Culture::English, "10,000.0000"),
+            (-1000, "N0", Culture::Italian, "-1.000"),
+            (-1000, "N3", Culture::Italian, "-1.000,000"),
+            (1, "N1", Culture::English, "1.0"),
+        ];
+
+        for (val_i32, to_format, culture, string_result) in vals {
+            assert_eq!(
+                val_i32.to_format(to_format, &culture).unwrap(),
+                string_result
+            );
+        }
+    }
+
+    #[test]
+    pub fn test_apply_decimal() {
+        let list = vec![
+            (2, FormatOption::new(4, 4), "2000"),
+            (265556, FormatOption::new(2, 2), "27"),
+            (512, FormatOption::new(2, 4), "512"),
+            (512, FormatOption::new(2, 2), "51"),
+            (512, FormatOption::new(5, 5), "51200"),
+        ];
+
+        for (num, format, string_num) in list {
+            assert_eq!(Number::<i32>::apply_decimal_format(
+                num,
+                format
+            ).unwrap(), string_num);
+        }
     }
 }

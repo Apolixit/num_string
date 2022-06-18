@@ -143,6 +143,7 @@ impl ConvertString {
     }
 }
 
+#[derive(Debug)]
 pub struct FormatOption {
     minimum_fraction_digit: u8,
     maximum_fraction_digit: u8,
@@ -502,21 +503,6 @@ mod tests {
         );
     }
 
-    #[test]
-    pub fn test_apply_decimal_format() {
-        let list = vec![
-            (512, FormatOption::new(2, 4), "512"),
-            (512, FormatOption::new(2, 2), "51"),
-            (512, FormatOption::new(5, 5), "51200"),
-        ];
-
-        for (num, format, string_num) in list {
-            assert_eq!(Number::<i32>::apply_decimal_format(
-                num,
-                format
-            ), string_num);
-        }
-    }
     #[test]
     pub fn test_number_to_format_integer() {
         let integers = vec![
