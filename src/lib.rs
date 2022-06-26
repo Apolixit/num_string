@@ -1,4 +1,4 @@
-use crate::number::Number;
+use crate::number_conversion::NumberConversion;
 use errors::ConversionError;
 use log::{error, info, trace, warn};
 use num::Num;
@@ -7,12 +7,12 @@ use pattern::{
 };
 use regex::Regex;
 use std::fmt::Display;
-use thousands::Separable;
+use std::str::FromStr;
 
 mod errors;
+mod number;
 mod number_conversion;
 mod pattern;
-mod number;
 
 /// Represent the current "ConvertString" culture
 #[derive(PartialEq, Debug, Clone, Copy)]
@@ -29,7 +29,7 @@ impl Default for &Culture {
     }
 }
 
-/// Main struct
+/// Structure to convert a string to number
 pub struct ConvertString {
     string_num: String,
     culture: Option<Culture>,
@@ -88,7 +88,7 @@ impl ConvertString {
         // Return the pattern which match
         match all_patterns
             .into_iter()
-            .find(|p| p.regex.is_match(string_num))
+            .find(|p| p.get_regex().is_match(string_num))
         {
             Some(pp) => {
                 info!("Input = {} / Pattern found = {}", &string_num, &pp);
@@ -109,7 +109,7 @@ impl ConvertString {
     /// Return true is the string has been succesfully converted into an integer
     pub fn is_integer(&self) -> bool {
         if let Some(pp) = self.get_current_pattern() {
-            return pp.number_type == NumberType::WHOLE;
+            return pp.get_number_type() == &NumberType::WHOLE;
         }
 
         false
@@ -118,28 +118,18 @@ impl ConvertString {
     /// Return true is the string has been succesfully converted into a float
     pub fn is_float(&self) -> bool {
         if let Some(pp) = self.get_current_pattern() {
-            return pp.number_type == NumberType::DECIMAL;
+            return pp.get_number_type() == &NumberType::DECIMAL;
         }
 
         false
     }
 
-    /// Convert the string into an integer
-    pub fn to_integer(&self) -> Option<Number<i32>> {
-        if let Some(pp) = self.get_current_pattern() {
-            return pp.to_integer(String::from(&self.string_num));
+    pub fn to_number<N: num::Num + Display + FromStr>(&self) -> Result<N, ConversionError> {
+        if let Some(culture) = self.culture {
+            self.string_num.as_str().to_number_culture::<N>(culture)
+        } else {
+            self.string_num.as_str().to_number::<N>()
         }
-
-        None
-    }
-
-    /// Convert the string into an float
-    pub fn to_float(&self) -> Option<Number<f32>> {
-        if let Some(pp) = self.get_current_pattern() {
-            return pp.to_float(String::from(&self.string_num));
-        }
-
-        None
     }
 }
 
@@ -167,142 +157,14 @@ impl Default for FormatOption {
     }
 }
 
-// #[derive(Debug, Clone, Copy, PartialEq)]
-// pub struct Number<T: Num + Display> {
-//     num: T,
-// }
-
-// impl<T: num::Num + Display> Number<T> {
-//     pub fn new(num: T) -> Number<T> {
-//         Number { num }
-//     }
-
-//     /// Split the current number into a string
-//     /// Return the Sign, the Whole part and the optional Decimal part
-//     /// For example :
-//     ///     10000.65    should return : ("+", "10000", Some("65"))
-//     ///     -10         should return : ("-", "10", None)
-//     /// See 'test_split_number' for example
-//     pub fn regex_read_number(&self) -> Result<(String, String, Option<String>), ConversionError> {
-//         let str = &self.num.to_string();
-
-//         let regex = Regex::new(r"([\-\+]?)([0-9]+)([\.]?)([0-9]*)").map_err(|e| {
-//             error!("{:?}", e);
-//             return ConversionError::UnableToConvertNumberToString;
-//         })?;
-
-//         let capture = regex
-//             .captures(str)
-//             .ok_or(ConversionError::NotCaptureFoundWhenConvertNumberToString)?;
-//         trace!("Text : {} / {:?}", str, capture);
-
-//         let capt = |index: usize| -> Option<String> {
-//             if let Some(matched) = capture.get(index) {
-//                 let match_str = matched.as_str();
-//                 if match_str.is_empty() {
-//                     return None;
-//                 } else {
-//                     return Some(String::from(match_str));
-//                 }
-//             }
-//             None
-//         };
-
-//         // Respectively : Sign (+ / -) | Whole part | Decimal part
-//         Ok((
-//             capt(1).unwrap_or(String::from("+")),
-//             capt(2).ok_or(ConversionError::UnableToConvertNumberToString)?,
-//             capt(4),
-//         ))
-//     }
-
-//     /// Return number to the current default culture format
-//     pub fn to_format(&self, culture: &Culture) -> Result<String, ConversionError> {
-//         self.to_format_options(culture, FormatOption::new(2, 2))
-//     }
-
-//     fn apply_thousand_separator(num: i32, culture: &Culture) -> String {
-//         let culture_settings = NumberCultureSettings::from(*culture);
-//         match culture_settings.to_thousand_separator() {
-//             Separator::COMMA => num.separate_with_commas(),
-//             Separator::DOT => num.separate_with_dots(),
-//             Separator::SPACE => num.separate_with_spaces(),
-//         }
-//     }
-
-//     /// Apply the format option to the decimal part (which is currently manipulated as a whole integer)
-//     pub fn apply_decimal_format(
-//         decimal_part: i32,
-//         options: FormatOption,
-//     ) -> String {
-//         let decimal_len = decimal_part.to_string().len() as u8;
-
-//         if decimal_len < options.minimum_fraction_digit {
-//             return (decimal_part
-//                 * 10_i32.pow((options.minimum_fraction_digit - decimal_len) as u32))
-//             .to_string();
-//         }
-
-//         if decimal_len > options.maximum_fraction_digit {
-//             return (decimal_part
-//                 / 10i32.pow((decimal_len - options.minimum_fraction_digit) as u32))
-//             .to_string();
-//         }
-
-//         decimal_part.to_string()
-//     }
-
-//     pub fn to_format_options(
-//         &self,
-//         culture: &Culture,
-//         format: FormatOption,
-//     ) -> Result<String, ConversionError> {
-//         let (sign_string, whole_string, decimal_opt_string) = self.regex_read_number()?;
-
-//         let mut number_string = Number::<T>::apply_thousand_separator(
-//             ConvertString::new(format!("{}{}", sign_string, whole_string).as_str(), None)
-//                 .to_integer()
-//                 .unwrap()
-//                 .num,
-//             culture,
-//         );
-
-//         if let Some(decimal_string) = decimal_opt_string {
-//             let decimal_part = ConvertString::new(decimal_string.as_str(), None)
-//                 .to_integer()
-//                 .unwrap()
-//                 .num;
-
-//             number_string = format!(
-//                 "{}{}{}",
-//                 number_string,
-//                 NumberCultureSettings::from(*culture).decimal_separator,
-//                 Number::<T>::apply_decimal_format(decimal_part, format)
-//             );
-//         }
-
-//         Ok(number_string)
-//     }
-// }
-// impl<T: num::Num + Display> PartialEq<T> for Number<T> {
-//     fn eq(&self, other: &T) -> bool {
-//         &self.num == other
-//     }
-// }
-
-// impl<T: num::Num + Display> Display for Number<T> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         write!(f, "{}", &self.num)
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
-    use num::Num;
-use crate::{pattern::NumberType, ConvertString, Culture, FormatOption, Number, number::ToFormat, number_conversion::NumberConversion};
+
+    use crate::{
+        errors::ConversionError, number::ToFormat, number_conversion::NumberConversion,
+        pattern::NumberType, ConvertString, Culture, FormatOption,
+    };
     use log::{info, warn};
-    use regex::Regex;
-    use thousands::Separable;
 
     // Run this function before each test
     #[ctor::ctor]
@@ -311,12 +173,8 @@ use crate::{pattern::NumberType, ConvertString, Culture, FormatOption, Number, n
     }
 
     #[test]
-    fn test_reverse_mapping_number()
-    {
-        let values_int = vec![
-            (1, "1", Culture::French),
-            (1000, "1 000", Culture::French)
-        ];
+    fn test_reverse_mapping_number() {
+        let values_int = vec![(1, "1", Culture::French), (1000, "1 000", Culture::French)];
 
         for (val_i32, val_str, culture) in values_int {
             assert_eq!(val_i32.to_format("N0", &culture).unwrap(), val_str);
@@ -325,7 +183,11 @@ use crate::{pattern::NumberType, ConvertString, Culture, FormatOption, Number, n
 
         let values_float = vec![
             (1.0, "1,00", Culture::French),
-            (1000.88, "1 000,88", Culture::French)
+            (1000.88, "1 000,88", Culture::French),
+            (-1582.99, "-1,582.99", Culture::English),
+            (1.0, "1.00", Culture::English),
+            (100000000.10, "100.000.000,10", Culture::Italian),
+            (-50.50, "-50,50", Culture::Italian),
         ];
 
         for (val_f64, val_str, culture) in values_float {
@@ -431,6 +293,7 @@ use crate::{pattern::NumberType, ConvertString, Culture, FormatOption, Number, n
     fn test_number(culture: Option<Culture>, list: Vec<(&str, i32, f32, NumberType)>) {
         for (string_num, int_value, float_value, number_type) in list {
             let convert = ConvertString::new(string_num, culture.to_owned());
+
             //All input are valid number
             assert_eq!(convert.is_numeric(), true, "Numeric number expected");
             assert_eq!(
@@ -453,33 +316,32 @@ use crate::{pattern::NumberType, ConvertString, Culture, FormatOption, Number, n
                     "float"
                 }
             );
-            let to_integer = convert.to_integer();
-            assert!(
-                to_integer.is_some(),
-                "to_integer() return none instead of some"
-            );
 
-            let to_float = convert.to_float();
-            assert!(to_float.is_some(), "to_float() return none instead of some");
+            let to_integer = convert.to_number::<i32>();
+            if number_type == NumberType::WHOLE {
+                assert!(to_integer.is_ok(), "to_number() return Err instead of Ok");
+                assert_eq!(
+                    convert.to_number::<i32>().unwrap(),
+                    int_value,
+                    "to_integer() conversion failed for {}",
+                    string_num
+                );
+            } else {
+                assert!(to_integer.is_err(), "to_number() return Ok instead of Err");
+                assert_eq!(
+                    convert.to_number::<i32>(),
+                    Err(ConversionError::UnableToConvertStringToNumber)
+                );
+            }
 
+            let to_float = convert.to_number::<f32>();
+            assert!(to_float.is_ok(), "to_float() return Err instead of Ok");
             assert_eq!(
-                convert.to_integer().unwrap(),
-                int_value,
-                "to_integer() conversion failed for {}",
-                string_num
-            );
-            assert_eq!(
-                convert.to_float().unwrap(),
+                convert.to_number::<f32>().unwrap(),
                 float_value,
                 "to_float() conversion failed for {}",
                 string_num
             );
-
-            info!(
-                "String input = {} / Cleaned input = {}",
-                string_num,
-                convert.to_float().unwrap()
-            )
         }
     }
 

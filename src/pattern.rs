@@ -1,9 +1,6 @@
 use crate::errors::ConversionError;
-use crate::number_conversion::FloatConversion;
-use crate::number_conversion::IntegerConversion;
 use crate::number_conversion::StringNumber;
 use crate::Culture;
-use crate::Number;
 use regex::Regex;
 use std::fmt::Display;
 
@@ -14,6 +11,8 @@ pub enum NumberType {
     DECIMAL,
 }
 
+/// Represent commons separators.
+/// Can be thousand or decimal separator
 #[derive(Debug, Clone, PartialEq)]
 pub enum Separator {
     SPACE,
@@ -21,16 +20,18 @@ pub enum Separator {
     COMMA,
 }
 
-impl From<Separator> for String {
+/// Get string slice from Separator
+impl From<Separator> for &str {
     fn from(e: Separator) -> Self {
         match e {
-            Separator::COMMA => String::from(","),
-            Separator::DOT => String::from("."),
-            Separator::SPACE => String::from(" "),
+            Separator::COMMA => ",",
+            Separator::DOT => ".",
+            Separator::SPACE => " ",
         }
     }
 }
 
+/// Try get Separator from string slice
 impl TryFrom<&str> for Separator {
     type Error = ConversionError;
 
@@ -63,13 +64,12 @@ impl RegexPattern {
 }
 
 /// The parsing pattern wrapper
-/// <I: num::Integer, F: num::Float>
 #[derive(Debug, Clone)]
 pub struct ParsingPattern {
     name: String,
     culture_settings: Option<NumberCultureSettings>,
-    pub regex: RegexPattern,
-    pub number_type: NumberType,
+    regex: RegexPattern,
+    number_type: NumberType,
     additional_pattern: Option<String>,
 }
 
@@ -80,13 +80,21 @@ impl Display for ParsingPattern {
 }
 
 impl ParsingPattern {
-    pub fn to_integer(&self, string_number: String) -> Option<Number<i32>> {
-        self.parsing(string_number).to_integer().ok()
+    pub fn get_regex(&self) -> &RegexPattern {
+        &self.regex
     }
 
-    pub fn to_float(&self, string_number: String) -> Option<Number<f32>> {
-        self.parsing(string_number).to_float().ok()
+    pub fn get_number_type(&self) -> &NumberType {
+        &self.number_type
     }
+
+    // pub fn to_integer(&self, string_number: String) -> Option<Number<i32>> {
+    //     self.parsing(string_number).to_integer().ok()
+    // }
+
+    // pub fn to_float(&self, string_number: String) -> Option<Number<f32>> {
+    //     self.parsing(string_number).to_float().ok()
+    // }
 
     fn parsing(&self, string_number: String) -> StringNumber {
         if self.culture_settings.is_none() {
@@ -97,6 +105,7 @@ impl ParsingPattern {
     }
 }
 
+/// Represent the current thousand and decimal separator
 #[derive(Debug, Clone)]
 pub struct NumberCultureSettings {
     pub thousand_separator: String,
@@ -104,7 +113,8 @@ pub struct NumberCultureSettings {
 }
 
 impl NumberCultureSettings {
-    pub fn new(thousand_separator: String, decimal_separator: String) -> NumberCultureSettings {
+    /// Create a new instance
+    pub fn new(thousand_separator: &str, decimal_separator: &str) -> NumberCultureSettings {
         //TODO : Check separator here
 
         NumberCultureSettings {
@@ -113,22 +123,27 @@ impl NumberCultureSettings {
         }
     }
 
+    /// Get English culture settings
     pub fn english_culture() -> NumberCultureSettings {
         NumberCultureSettings::new(Separator::COMMA.into(), Separator::DOT.into())
     }
 
+    /// Get French culture settings
     pub fn french_culture() -> NumberCultureSettings {
         NumberCultureSettings::new(Separator::SPACE.into(), Separator::COMMA.into())
     }
 
+    /// Get Italian culture settings
     pub fn italian_culture() -> NumberCultureSettings {
         NumberCultureSettings::new(Separator::DOT.into(), Separator::COMMA.into())
     }
 
+    /// Try to convert string thousand separator to enum
     pub fn to_thousand_separator(&self) -> Separator {
         self.thousand_separator.as_str().try_into().unwrap()
     }
 
+    /// Try to convert string decimal separator to enum
     pub fn to_decimal_separator(&self) -> Separator {
         self.decimal_separator.as_str().try_into().unwrap()
     }
@@ -136,10 +151,11 @@ impl NumberCultureSettings {
 
 impl From<(&str, &str)> for NumberCultureSettings {
     fn from(val: (&str, &str)) -> Self {
-        NumberCultureSettings::new(String::from(val.0), String::from(val.1))
+        NumberCultureSettings::new(val.0, val.1)
     }
 }
 
+/// Get the culture settings from current culture
 impl From<Culture> for NumberCultureSettings {
     fn from(culture: Culture) -> Self {
         match culture {

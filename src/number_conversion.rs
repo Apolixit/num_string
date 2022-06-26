@@ -39,13 +39,13 @@ pub trait NumberConversion {
 //     ) -> Result<N, ConversionError>;
 // }
 
-pub trait IntegerConversion<I: num::Integer + Display> {
-    fn to_integer(&self) -> Result<Number<I>, ConversionError>;
-}
+// pub trait IntegerConversion<I: num::Integer + Display> {
+//     fn to_integer(&self) -> Result<Number<I>, ConversionError>;
+// }
 
-pub trait FloatConversion<F: num::Float + Display> {
-    fn to_float(&self) -> Result<Number<F>, ConversionError>;
-}
+// pub trait FloatConversion<F: num::Float + Display> {
+//     fn to_float(&self) -> Result<Number<F>, ConversionError>;
+// }
 
 /// Structure which represent a string number (can be either well formated or bad formated)
 pub struct StringNumber {
@@ -234,30 +234,30 @@ impl NumberConversion for StringNumber {
 }
 
 /// Convert the string number to integer
-impl IntegerConversion<i32> for StringNumber {
-    fn to_integer(&self) -> Result<Number<i32>, ConversionError> {
-        Ok(Number::new(self.clean().parse::<f32>().map_err(|e| {
-            warn!("{}", e.to_string());
-            ConversionError::UnableToConvertStringToNumber
-        })? as i32))
-    }
-}
+// impl IntegerConversion<i32> for StringNumber {
+//     fn to_integer(&self) -> Result<Number<i32>, ConversionError> {
+//         Ok(Number::new(self.clean().parse::<f32>().map_err(|e| {
+//             warn!("{}", e.to_string());
+//             ConversionError::UnableToConvertStringToNumber
+//         })? as i32))
+//     }
+// }
 
-/// Convert the string number to float
-impl FloatConversion<f32> for StringNumber {
-    fn to_float(&self) -> Result<Number<f32>, ConversionError> {
-        Ok(Number::new(self.clean().parse::<f32>().map_err(|e| {
-            warn!("{}", e.to_string());
-            ConversionError::UnableToConvertStringToNumber
-        })?))
-    }
-}
+// /// Convert the string number to float
+// impl FloatConversion<f32> for StringNumber {
+//     fn to_float(&self) -> Result<Number<f32>, ConversionError> {
+//         Ok(Number::new(self.clean().parse::<f32>().map_err(|e| {
+//             warn!("{}", e.to_string());
+//             ConversionError::UnableToConvertStringToNumber
+//         })?))
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
     use crate::{
         errors::ConversionError,
-        number_conversion::{FloatConversion, IntegerConversion, NumberConversion, StringNumber},
+        number_conversion::{NumberConversion, StringNumber},
         pattern::{NumberCultureSettings, Separator},
     };
 
@@ -417,7 +417,7 @@ mod tests {
             let wn = StringNumber::new(String::from(string_value));
 
             assert_eq!(
-                wn.to_integer(),
+                wn.to_number::<i32>(),
                 Err(ConversionError::UnableToConvertStringToNumber)
             );
         }

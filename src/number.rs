@@ -183,9 +183,8 @@ impl<T: num::Num + Display> Number<T> {
         let calc_to_string = |sign_string, whole_string| -> String {
             Number::<T>::apply_thousand_separator(
                 ConvertString::new(format!("{}{}", sign_string, whole_string).as_str(), None)
-                    .to_integer()
-                    .unwrap()
-                    .num,
+                    .to_number::<i32>()
+                    .unwrap(),
                 culture,
             )
         };
@@ -194,9 +193,8 @@ impl<T: num::Num + Display> Number<T> {
         // the decimal read by the previous regex or "0" if None
         let decimal_string = decimal_opt_string.unwrap_or("0".to_owned());
         let decimal_part = ConvertString::new(decimal_string.as_str(), None)
-            .to_integer()
-            .unwrap()
-            .num;
+            .to_number::<i32>()
+            .unwrap();
 
         trace!("Decimal part : {}", decimal_part);
         let decimal_opt = Number::<T>::apply_decimal_format(decimal_part, format);
