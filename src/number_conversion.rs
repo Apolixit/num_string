@@ -8,7 +8,6 @@ use regex::Regex;
 
 use crate::{errors::ConversionError, number::Number, pattern::NumberCultureSettings};
 
-/// Trait with string conversion functions
 pub trait NumberConversion {
     /// Try to convert a common string (not culture dependent)
     fn to_number<N: num::Num + Display + FromStr>(&self) -> Result<N, ConversionError>;
@@ -25,6 +24,21 @@ pub trait NumberConversion {
         culture: Culture,
     ) -> Result<N, ConversionError>;
 }
+
+// pub trait NumberConversionAdvanced {
+//     /// Try to convert a string with given thousand and decimal separator
+//     fn to_number_separators<N: num::Num + Display + FromStr>(
+//         &self,
+//         separators: NumberCultureSettings,
+//     ) -> Result<N, ConversionError>;
+
+//     /// Try to convert a string with given culture
+//     fn to_number_culture<N: num::Num + Display + FromStr>(
+//         &self,
+//         culture: Culture,
+//     ) -> Result<N, ConversionError>;
+// }
+
 pub trait IntegerConversion<I: num::Integer + Display> {
     fn to_integer(&self) -> Result<Number<I>, ConversionError>;
 }
@@ -33,12 +47,14 @@ pub trait FloatConversion<F: num::Float + Display> {
     fn to_float(&self) -> Result<Number<F>, ConversionError>;
 }
 
+/// Structure which represent a string number (can be either well formated or bad formated)
 pub struct StringNumber {
     value: String,
     number_culture_settings: Option<NumberCultureSettings>,
 }
 
 impl StringNumber {
+    /// Create a new instance with only the string number
     pub fn new(value: String) -> StringNumber {
         StringNumber {
             value,
@@ -46,6 +62,7 @@ impl StringNumber {
         }
     }
 
+    /// Create a new instance with the thousand and decimal separator
     pub fn new_with_settings(
         value: String,
         number_culture_settings: NumberCultureSettings,
@@ -61,6 +78,7 @@ impl StringNumber {
         self.number_culture_settings.is_some()
     }
 
+    /// Get the decimal separator for float number in Rust
     pub fn string_decimal_replacement() -> String {
         String::from(".")
     }
@@ -86,6 +104,7 @@ impl StringNumber {
     }
 
     /// Create regex from struct to clean the string
+    /// Return the string cleaned
     pub fn clean(&self) -> String {
         info!(
             "Clean with string input = {} and separators = {:?}",
@@ -241,7 +260,6 @@ mod tests {
         number_conversion::{FloatConversion, IntegerConversion, NumberConversion, StringNumber},
         pattern::{NumberCultureSettings, Separator},
     };
-    use std::str::FromStr;
 
     fn DOT_COMMA() -> NumberCultureSettings {
         NumberCultureSettings::from((".", ","))
