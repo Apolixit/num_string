@@ -3,7 +3,7 @@ use errors::ConversionError;
 use log::{error, info, trace, warn};
 use num::Num;
 use pattern::{
-    CulturePattern, NumberCultureSettings, NumberType, ParsingPattern, Patterns, Separator,
+    CulturePattern, NumberCultureSettings, NumberType, ParsingPattern, NumberPatterns, Separator,
 };
 use regex::Regex;
 use std::fmt::Display;
@@ -33,7 +33,7 @@ impl Default for &Culture {
 pub struct ConvertString {
     string_num: String,
     culture: Option<Culture>,
-    all_patterns: Patterns,
+    all_patterns: NumberPatterns,
 }
 
 impl ConvertString {
@@ -47,8 +47,8 @@ impl ConvertString {
     }
 
     /// Load all patterns
-    fn load_patterns() -> Patterns {
-        Patterns::default()
+    fn load_patterns() -> NumberPatterns {
+        NumberPatterns::default()
     }
 
     /// Return the pattern selected for conversion
@@ -61,7 +61,7 @@ impl ConvertString {
     }
 
     /// Get culture pattern from culture
-    pub fn find_culture_pattern(culture: &Culture, patterns: &Patterns) -> Option<CulturePattern> {
+    pub fn find_culture_pattern(culture: &Culture, patterns: &NumberPatterns) -> Option<CulturePattern> {
         patterns
             .get_all_culture_pattern()
             .into_iter()
@@ -72,7 +72,7 @@ impl ConvertString {
     pub fn find_pattern(
         string_num: &str,
         culture: &Culture,
-        patterns: &Patterns,
+        patterns: &NumberPatterns,
     ) -> Option<ParsingPattern> {
         //First, we search in common pattern (not currency dependent) and currency pattern
         let mut all_patterns = patterns.get_common_pattern();

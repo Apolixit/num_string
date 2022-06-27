@@ -45,8 +45,6 @@ impl TryFrom<&str> for Separator {
     }
 }
 
-pub type Convertable = dyn ToString;
-
 /// Regex use to try to convert string to number
 #[derive(Debug, Clone)]
 pub struct RegexPattern {
@@ -56,6 +54,7 @@ pub struct RegexPattern {
 }
 
 impl RegexPattern {
+    /// Return if the string number has been matched by the regex
     pub fn is_match(&self, text: &str) -> bool {
         let full_regex =
             Regex::new(format!("{}{}{}", self.prefix, self.content, self.suffix).as_str()).unwrap();
@@ -86,23 +85,7 @@ impl ParsingPattern {
 
     pub fn get_number_type(&self) -> &NumberType {
         &self.number_type
-    }
-
-    // pub fn to_integer(&self, string_number: String) -> Option<Number<i32>> {
-    //     self.parsing(string_number).to_integer().ok()
-    // }
-
-    // pub fn to_float(&self, string_number: String) -> Option<Number<f32>> {
-    //     self.parsing(string_number).to_float().ok()
-    // }
-
-    fn parsing(&self, string_number: String) -> StringNumber {
-        if self.culture_settings.is_none() {
-            StringNumber::new(string_number)
-        } else {
-            StringNumber::new_with_settings(string_number, self.culture_settings.clone().unwrap())
-        }
-    }
+    }    
 }
 
 /// Represent the current thousand and decimal separator
@@ -189,21 +172,23 @@ impl CulturePattern {
 }
 
 /// All pattern defined to try to convert string to number
-pub struct Patterns {
+pub struct NumberPatterns {
     common_pattern: Vec<ParsingPattern>,
     culture_pattern: Vec<CulturePattern>,
     math_pattern: Vec<ParsingPattern>,
 }
 
-impl Patterns {
-    pub fn new() -> Patterns {
-        Patterns::default()
+impl NumberPatterns {
+    pub fn new() -> NumberPatterns {
+        NumberPatterns::default()
     }
 
+    /// Return all culture pattern
     pub fn get_all_culture_pattern(&self) -> Vec<CulturePattern> {
         self.culture_pattern.to_vec()
     }
 
+    /// Try to return the culture pattern from the following culture
     pub fn get_culture_pattern(&self, culture: &Culture) -> Option<CulturePattern> {
         self.get_all_culture_pattern().into_iter().find(|c| {
             c.get_cultures()
@@ -233,9 +218,9 @@ impl Patterns {
     }
 }
 
-impl Default for Patterns {
+impl Default for NumberPatterns {
     fn default() -> Self {
-        Patterns {
+        NumberPatterns {
             common_pattern: vec![ParsingPattern {
                 /*
                  * X / +X / -X
@@ -466,7 +451,7 @@ impl Default for Patterns {
 
 #[cfg(test)]
 mod tests {
-    use super::Patterns;
+    use super::NumberPatterns;
     use crate::Culture;
     use regex::Regex;
 
@@ -478,7 +463,7 @@ mod tests {
 
     #[test]
     fn test_parsing_pattern_fr() {
-        let optionnal_fr_pattern = Patterns::default().get_culture_pattern(&Culture::French);
+        let optionnal_fr_pattern = NumberPatterns::default().get_culture_pattern(&Culture::French);
 
         //We need to have an fr pattern
         assert!(optionnal_fr_pattern.is_some());
@@ -489,7 +474,7 @@ mod tests {
 
     #[test]
     fn test_parsing_pattern_en() {
-        let optionnal_en_pattern = Patterns::default().get_culture_pattern(&Culture::English);
+        let optionnal_en_pattern = NumberPatterns::default().get_culture_pattern(&Culture::English);
 
         //We need to have an en pattern
         assert!(optionnal_en_pattern.is_some());
@@ -500,7 +485,7 @@ mod tests {
 
     #[test]
     fn test_parsing_pattern_it() {
-        let optionnal_en_pattern = Patterns::default().get_culture_pattern(&Culture::Italian);
+        let optionnal_en_pattern = NumberPatterns::default().get_culture_pattern(&Culture::Italian);
 
         //We need to have an it pattern
         assert!(optionnal_en_pattern.is_some());

@@ -1,5 +1,6 @@
 use std::{fmt::Display};
 
+/// The different kind of error which can happen during the conversion
 #[derive(Debug, PartialEq)]
 pub enum ConversionError {
     UnableToConvertStringToNumber,
