@@ -9,6 +9,7 @@ pub enum ConversionError {
     UnableToDisplayFormat,
     PatternCultureNotFound,
     SeparatorNotFound,
+    RegexBuilder
 }
 
 impl ConversionError {
@@ -19,7 +20,8 @@ impl ConversionError {
             Self::NotCaptureFoundWhenConvertNumberToString => "No capture found when trying to parse number to string number",
             Self::UnableToDisplayFormat => "Error when trying to display format number",
             Self::PatternCultureNotFound => "Unable to find pattern culture",
-            Self::SeparatorNotFound => "Unable to find separator from string"
+            Self::SeparatorNotFound => "Unable to find separator from string",
+            Self::RegexBuilder => "Unable to create regex",
         }
     }
 }

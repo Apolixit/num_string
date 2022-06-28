@@ -211,7 +211,7 @@ impl<T: num::Num + Display> Number<T> {
             number_string = format!(
                 "{}{}{}",
                 number_string,
-                NumberCultureSettings::from(*culture).decimal_separator,
+                NumberCultureSettings::from(*culture).to_decimal_separator_string(),
                 decimal_format
             );
         } else {

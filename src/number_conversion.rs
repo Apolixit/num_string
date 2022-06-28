@@ -125,14 +125,14 @@ impl StringNumber {
         if self.has_settings() {
             trace!(
                 "Decimal ({}) and thousand ({}) separator has been specified",
-                &self.get_settings().unwrap().decimal_separator,
-                &self.get_settings().unwrap().thousand_separator
+                &self.get_settings().unwrap().to_decimal_separator_string(),
+                &self.get_settings().unwrap().to_thousand_separator_string()
             );
 
             trace!("Begin thousand separator replace");
             string_value = replace(
                 &string_value,
-                &self.get_settings().unwrap().thousand_separator.as_str(),
+                &self.get_settings().unwrap().to_thousand_separator_string(),
                 "",
             );
             trace!(
@@ -143,7 +143,7 @@ impl StringNumber {
             trace!("Begin decimal separator replace");
             string_value = replace(
                 &string_value,
-                &self.get_settings().unwrap().decimal_separator.as_str(),
+                &self.get_settings().unwrap().to_decimal_separator_string(),
                 StringNumber::string_decimal_replacement().as_str(),
             );
             trace!(

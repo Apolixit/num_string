@@ -29,6 +29,19 @@ impl Default for &Culture {
     }
 }
 
+impl TryFrom<&str> for Culture {
+    type Error = ConversionError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(match value {
+            "en" => Culture::English,
+            "fr" => Culture::French,
+            "it" => Culture::Italian,
+            _ => return Err(ConversionError::PatternCultureNotFound)
+        })
+    }
+}
+
 /// Structure to convert a string to number
 pub struct ConvertString {
     string_num: String,
@@ -65,7 +78,7 @@ impl ConvertString {
         patterns
             .get_all_culture_pattern()
             .into_iter()
-            .find(|c| c.get_cultures().iter().any(|cc| cc == culture))
+            .find(|c| c.get_culture() == culture)
     }
 
     /// Find a matching pattern for the given string num
