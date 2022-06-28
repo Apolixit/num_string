@@ -20,11 +20,11 @@ use thousands::Separable;
 /// # Example
 /// ```
 /// use num_string::{Culture, ToFormat};
-///     assert_eq!(1000.to_format("N0", &Culture::English).unwrap(), "1,000");
-///     assert_eq!(1000.to_format("N2", &Culture::French).unwrap(), "1 000,00");
+///     assert_eq!(1000.to_format("N0", Culture::English).unwrap(), "1,000");
+///     assert_eq!(1000.to_format("N2", Culture::French).unwrap(), "1 000,00");
 /// ```
 pub trait ToFormat {
-    fn to_format(self, format: &str, culture: &Culture) -> Result<String, ConversionError>;
+    fn to_format(self, format: &str, culture: Culture) -> Result<String, ConversionError>;
 }
 
 /// Implement the trait for all primitive (i8, i64, u32, f32 etc.), thanks to Num trait
@@ -32,9 +32,9 @@ impl<T> ToFormat for T
 where
     T: Num + Display,
 {
-    fn to_format(self, digit: &str, culture: &Culture) -> Result<String, ConversionError> {
+    fn to_format(self, digit: &str, culture: Culture) -> Result<String, ConversionError> {
         let nb_digit = Number::<T>::set_nb_digits(digit)?;
-        Number::<T>::new(self).to_format_options(culture, FormatOption::new(nb_digit, nb_digit))
+        Number::<T>::new(self).to_format_options(&culture, FormatOption::new(nb_digit, nb_digit))
     }
 }
 
@@ -285,7 +285,7 @@ use crate::{number::ToFormat, Culture, errors::ConversionError};
 
         for (val_i32, to_format, culture, string_result) in vals_i32 {
             assert_eq!(
-                val_i32.to_format(to_format, &culture).unwrap(),
+                val_i32.to_format(to_format, culture).unwrap(),
                 string_result
             );
         }
@@ -301,7 +301,7 @@ use crate::{number::ToFormat, Culture, errors::ConversionError};
 
         for (val_i8, to_format, culture, string_result) in vals_i8 {
             assert_eq!(
-                val_i8.to_format(to_format, &culture).unwrap(),
+                val_i8.to_format(to_format, culture).unwrap(),
                 string_result
             );
         }
@@ -314,7 +314,7 @@ use crate::{number::ToFormat, Culture, errors::ConversionError};
 
         for (val_u64, to_format, culture, string_result) in vals_u64 {
             assert_eq!(
-                val_u64.to_format(to_format, &culture).unwrap(),
+                val_u64.to_format(to_format, culture).unwrap(),
                 string_result
             );
         }
@@ -338,7 +338,7 @@ use crate::{number::ToFormat, Culture, errors::ConversionError};
 
         for (val_f64, to_format, culture, string_result) in vals_f64 {
             assert_eq!(
-                val_f64.to_format(to_format, &culture).unwrap(),
+                val_f64.to_format(to_format, culture).unwrap(),
                 string_result
             );
         }

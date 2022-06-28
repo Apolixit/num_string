@@ -49,11 +49,11 @@ pub use pattern::{NumberCultureSettings, Separator};
 /// ```
 /// use num_string::{Culture, ToFormat};
 ///     // Some basic display
-///     assert_eq!(1000.to_format("N0", &Culture::English).unwrap(), "1,000");
-///     assert_eq!(1000.to_format("N2", &Culture::French).unwrap(), "1 000,00");
+///     assert_eq!(1000.to_format("N0", Culture::English).unwrap(), "1,000");
+///     assert_eq!(1000.to_format("N2", Culture::French).unwrap(), "1 000,00");
 /// 
 ///     // Perform the round decimal
-///     assert_eq!(10000.9999.to_format("N2", &Culture::French).unwrap(), "10 001,00");
+///     assert_eq!(10000.9999.to_format("N2", Culture::French).unwrap(), "10 001,00");
 /// ```
 /// Please ref to other file for more advanced tests and explaination
 
@@ -105,7 +105,7 @@ use crate::{
     #[test]
     fn x() {
         assert_eq!("1000".to_number::<i32>().unwrap(), 1000);
-        assert_eq!(1000.to_format("N2", &Culture::French).unwrap(), "1 000,00");
+        assert_eq!(1000.to_format("N2", Culture::French).unwrap(), "1 000,00");
         assert_eq!("1000".to_number::<i8>(), Err(ConversionError::UnableToConvertStringToNumber));
         assert_eq!("1000".to_number::<f32>().unwrap(), 1000.0);
         assert_eq!("1,000.8888".to_number_culture::<f32>(Culture::English).unwrap(), 1000.8888);
@@ -125,7 +125,7 @@ use crate::{
 
         for (number, culture, to_string_format) in integers {
             assert_eq!(
-                number.to_format("N0", &culture).unwrap(),
+                number.to_format("N0", culture).unwrap(),
                 String::from(to_string_format)
             );
         }
@@ -142,7 +142,7 @@ use crate::{
 
         for (number, culture, to_string_format) in floats {
             assert_eq!(
-                number.to_format("N2", &culture).unwrap(),
+                number.to_format("N2", culture).unwrap(),
                 String::from(to_string_format)
             );
         }
@@ -153,7 +153,7 @@ use crate::{
         let values_int = vec![(1, "1", Culture::French), (1000, "1 000", Culture::French)];
 
         for (val_i32, val_str, culture) in values_int {
-            assert_eq!(val_i32.to_format("N0", &culture).unwrap(), val_str);
+            assert_eq!(val_i32.to_format("N0", culture).unwrap(), val_str);
             assert_eq!(val_str.to_number_culture::<i32>(culture).unwrap(), val_i32);
         }
 
@@ -167,7 +167,7 @@ use crate::{
         ];
 
         for (val_f64, val_str, culture) in values_float {
-            assert_eq!(val_f64.to_format("N2", &culture).unwrap(), val_str);
+            assert_eq!(val_f64.to_format("N2", culture).unwrap(), val_str);
             assert_eq!(val_str.to_number_culture::<f64>(culture).unwrap(), val_f64);
         }
     }
