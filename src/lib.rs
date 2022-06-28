@@ -1,18 +1,62 @@
-use crate::number_conversion::NumberConversion;
-use errors::ConversionError;
-use log::{error, info, trace, warn};
-use num::Num;
-use pattern::{
-    CulturePattern, NumberCultureSettings, NumberType, ParsingPattern, NumberPatterns, Separator,
-};
 use regex::Regex;
-use std::fmt::Display;
-use std::str::FromStr;
 
 mod errors;
 mod number;
 mod number_conversion;
 mod pattern;
+
+pub use number::ToFormat;
+pub use number_conversion::NumberConversion;
+pub use errors::ConversionError;
+pub use pattern::{NumberCultureSettings, Separator};
+
+
+/// This crate perform conversion between string and number
+/// It allows to convert culture formated number to Rust number
+/// And it allowed to display Rust numbers to culture formated string
+/// 
+/// Here some basic utilisation :
+/// # Example string to number
+/// 
+/// ## Basic string to number
+/// ```
+/// use num_string::{Culture, ConversionError, NumberConversion};
+/// 
+///     // Basic string number
+///     assert_eq!("1000".to_number::<i32>().unwrap(), 1000);
+///     assert_eq!("+1000".to_number::<i64>().unwrap(), 1000);
+///     assert_eq!("-1000".to_number::<i64>().unwrap(), -1000);
+///     assert_eq!("1000".to_number::<f32>().unwrap(), 1000.0);
+///
+///     // Fail because 1000 > i8 capacity
+///     assert_eq!("1000".to_number::<i8>(), Err(ConversionError::UnableToConvertStringToNumber));
+/// ```
+/// 
+/// ## For more advanced conversion you can specify culture
+/// ```
+/// use num_string::{Culture, NumberConversion};
+///     assert_eq!("1,000.8888".to_number_culture::<f32>(Culture::English).unwrap(), 1000.8888);
+///     assert_eq!("-10 564,10".to_number_culture::<f32>(Culture::French).unwrap(), -10564.10);
+/// ```
+/// 
+/// ## You can also specify some custom (DOT as thousand separator and SPACE a decimal separator)
+/// ```
+/// use num_string::{NumberCultureSettings, Separator, NumberConversion};
+///     assert_eq!("1.000 8888".to_number_separators::<f32>(NumberCultureSettings::new(Separator::DOT, Separator::SPACE)).unwrap(), 1000.8888);
+/// ```
+/// 
+/// # Example number to string
+/// ```
+/// use num_string::{Culture, ToFormat};
+///     // Some basic display
+///     assert_eq!(1000.to_format("N0", &Culture::English).unwrap(), "1,000");
+///     assert_eq!(1000.to_format("N2", &Culture::French).unwrap(), "1 000,00");
+/// 
+///     // Perform the round decimal
+///     assert_eq!(10000.9999.to_format("N2", &Culture::French).unwrap(), "10 001,00");
+/// ```
+/// Please ref to other file for more advanced tests and explaination
+
 
 /// Represent the current "ConvertString" culture
 #[derive(PartialEq, Debug, Clone, Copy)]
@@ -23,9 +67,9 @@ pub enum Culture {
 }
 
 /// Default culture = English
-impl Default for &Culture {
+impl Default for Culture {
     fn default() -> Self {
-        &Culture::English
+        Culture::English
     }
 }
 
@@ -42,147 +86,66 @@ impl TryFrom<&str> for Culture {
     }
 }
 
-/// Structure to convert a string to number
-pub struct ConvertString {
-    string_num: String,
-    culture: Option<Culture>,
-    all_patterns: NumberPatterns,
-}
-
-impl ConvertString {
-    /// Create a new ConvertString instance
-    pub fn new(string_num: &str, culture: Option<Culture>) -> ConvertString {
-        ConvertString {
-            string_num: String::from(string_num),
-            culture,
-            all_patterns: ConvertString::load_patterns(),
-        }
-    }
-
-    /// Load all patterns
-    fn load_patterns() -> NumberPatterns {
-        NumberPatterns::default()
-    }
-
-    /// Return the pattern selected for conversion
-    fn get_current_pattern(&self) -> Option<ParsingPattern> {
-        ConvertString::find_pattern(
-            &self.string_num,
-            self.culture.as_ref().unwrap_or_default(),
-            &self.all_patterns,
-        )
-    }
-
-    /// Get culture pattern from culture
-    pub fn find_culture_pattern(culture: &Culture, patterns: &NumberPatterns) -> Option<CulturePattern> {
-        patterns
-            .get_all_culture_pattern()
-            .into_iter()
-            .find(|c| c.get_culture() == culture)
-    }
-
-    /// Find a matching pattern for the given string num
-    pub fn find_pattern(
-        string_num: &str,
-        culture: &Culture,
-        patterns: &NumberPatterns,
-    ) -> Option<ParsingPattern> {
-        //First, we search in common pattern (not currency dependent) and currency pattern
-        let mut all_patterns = patterns.get_common_pattern();
-
-        let pattern_culture = ConvertString::find_culture_pattern(&culture, &patterns);
-
-        if pattern_culture.is_none() {
-            warn!("{}", ConversionError::PatternCultureNotFound.message());
-        } else {
-            all_patterns.extend(pattern_culture.unwrap().get_patterns().clone());
-        }
-
-        // Return the pattern which match
-        match all_patterns
-            .into_iter()
-            .find(|p| p.get_regex().is_match(string_num))
-        {
-            Some(pp) => {
-                info!("Input = {} / Pattern found = {}", &string_num, &pp);
-                return Some(pp);
-            }
-            None => {
-                info!("No Pattern found for '{}'", &string_num);
-                return None;
-            }
-        }
-    }
-
-    /// Return true is the string has been succesfully converted into number
-    pub fn is_numeric(&self) -> bool {
-        self.get_current_pattern().is_some()
-    }
-
-    /// Return true is the string has been succesfully converted into an integer
-    pub fn is_integer(&self) -> bool {
-        if let Some(pp) = self.get_current_pattern() {
-            return pp.get_number_type() == &NumberType::WHOLE;
-        }
-
-        false
-    }
-
-    /// Return true is the string has been succesfully converted into a float
-    pub fn is_float(&self) -> bool {
-        if let Some(pp) = self.get_current_pattern() {
-            return pp.get_number_type() == &NumberType::DECIMAL;
-        }
-
-        false
-    }
-
-    pub fn to_number<N: num::Num + Display + FromStr>(&self) -> Result<N, ConversionError> {
-        if let Some(culture) = self.culture {
-            self.string_num.as_str().to_number_culture::<N>(culture)
-        } else {
-            self.string_num.as_str().to_number::<N>()
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct FormatOption {
-    minimum_fraction_digit: u8,
-    maximum_fraction_digit: u8,
-}
-
-impl FormatOption {
-    pub fn new(minimum_fraction_digit: u8, maximum_fraction_digit: u8) -> FormatOption {
-        FormatOption {
-            minimum_fraction_digit,
-            maximum_fraction_digit,
-        }
-    }
-}
-
-impl Default for FormatOption {
-    fn default() -> Self {
-        Self {
-            minimum_fraction_digit: 2,
-            maximum_fraction_digit: 2,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
 
-    use crate::{
-        errors::ConversionError, number::ToFormat, number_conversion::NumberConversion,
-        pattern::NumberType, ConvertString, Culture, FormatOption,
+use crate::errors::ConversionError;
+use crate::number_conversion::NumberConversion;
+use crate::NumberCultureSettings;
+use crate::{
+        number::ToFormat,
+        pattern::{NumberType, Separator}, Culture,
     };
-    use log::{info, warn};
 
     // Run this function before each test
     #[ctor::ctor]
     fn init() {
         env_logger::init();
+    }
+    #[test]
+    fn x() {
+        assert_eq!("1000".to_number::<i32>().unwrap(), 1000);
+        assert_eq!(1000.to_format("N2", &Culture::French).unwrap(), "1 000,00");
+        assert_eq!("1000".to_number::<i8>(), Err(ConversionError::UnableToConvertStringToNumber));
+        assert_eq!("1000".to_number::<f32>().unwrap(), 1000.0);
+        assert_eq!("1,000.8888".to_number_culture::<f32>(Culture::English).unwrap(), 1000.8888);
+        
+    }
+
+    #[test]
+    fn test_number_to_format_integer() {
+        let integers = vec![
+            (2000i64, Culture::English, "2,000"),
+            (2000, Culture::French, "2 000"),
+            (2000, Culture::Italian, "2.000"),
+            (-2000, Culture::English, "-2,000"),
+            (-2000, Culture::French, "-2 000"),
+            (-2000, Culture::Italian, "-2.000"),
+        ];
+
+        for (number, culture, to_string_format) in integers {
+            assert_eq!(
+                number.to_format("N0", &culture).unwrap(),
+                String::from(to_string_format)
+            );
+        }
+    }
+
+    #[test]
+    fn test_number_to_format_float() {
+        let floats = vec![
+            (2_000.98, Culture::English, "2,000.98"),
+            (-2_000.98, Culture::French, "-2 000,98"),
+            (2_000.98, Culture::Italian, "2.000,98"),
+            (049_490.8257, Culture::English, "49,490.83"),
+        ];
+
+        for (number, culture, to_string_format) in floats {
+            assert_eq!(
+                number.to_format("N2", &culture).unwrap(),
+                String::from(to_string_format)
+            );
+        }
     }
 
     #[test]
@@ -208,229 +171,4 @@ mod tests {
             assert_eq!(val_str.to_number_culture::<f64>(culture).unwrap(), val_f64);
         }
     }
-
-    #[test]
-    fn test_common_number() {
-        let convert = ConvertString::new("10,2", Some(Culture::French));
-        assert!(convert.is_float());
-    }
-
-    #[test]
-    fn test_number_french() {
-        let list = vec![
-            ("10", 10, 10.0, NumberType::WHOLE),
-            ("+10", 10, 10.0, NumberType::WHOLE),
-            ("-102", -102, -102., NumberType::WHOLE),
-            ("+1 000", 1000, 1000.0, NumberType::WHOLE),
-            ("2 500 563", 2500563, 2_500_563.0, NumberType::WHOLE),
-            ("-200000", -200000, -200000.0, NumberType::WHOLE),
-            (",25", 0, 0.25, NumberType::DECIMAL),
-            ("10,2", 10, 10.2, NumberType::DECIMAL),
-            ("0,25", 0, 0.25, NumberType::DECIMAL),
-            ("-10,5", -10, -10.5, NumberType::DECIMAL),
-            ("1000,89", 1000, 1000.89, NumberType::DECIMAL),
-            (
-                "+1 000,4564654654654",
-                1000,
-                1000.4564654654654,
-                NumberType::DECIMAL,
-            ),
-            (
-                "1000,4564654654654",
-                1000,
-                1000.4564654654654,
-                NumberType::DECIMAL,
-            ),
-        ];
-        test_number(Some(Culture::French), list);
-    }
-
-    #[test]
-    fn test_number_english() {
-        let list = vec![
-            ("10", 10, 10.0, NumberType::WHOLE),
-            ("-102", -102, -102., NumberType::WHOLE),
-            ("1,000", 1000, 1000.0, NumberType::WHOLE),
-            ("-200000", -200000, -200000.0, NumberType::WHOLE),
-            ("2,500,563", 2500563, 2_500_563.0, NumberType::WHOLE),
-            ("10.2", 10, 10.2, NumberType::DECIMAL),
-            ("0.4", 0, 0.4, NumberType::DECIMAL),
-            ("0.25", 0, 0.25, NumberType::DECIMAL),
-            ("-10.5", -10, -10.5, NumberType::DECIMAL),
-            ("1000.89", 1000, 1000.89, NumberType::DECIMAL),
-            (
-                "1,000.4564654654654",
-                1000,
-                1000.4564654654654,
-                NumberType::DECIMAL,
-            ),
-            (
-                "1000.4564654654654",
-                1000,
-                1000.4564654654654,
-                NumberType::DECIMAL,
-            ),
-        ];
-        test_number(Some(Culture::English), list);
-    }
-
-    #[test]
-    fn test_number_italian() {
-        let list = vec![
-            ("10", 10, 10.0, NumberType::WHOLE),
-            ("-102", -102, -102., NumberType::WHOLE),
-            ("1.000", 1000, 1000.0, NumberType::WHOLE),
-            ("-200000", -200000, -200000.0, NumberType::WHOLE),
-            ("2.500.563", 2500563, 2_500_563.0, NumberType::WHOLE),
-            ("10,2", 10, 10.2, NumberType::DECIMAL),
-            ("0,4", 0, 0.4, NumberType::DECIMAL),
-            ("0,25", 0, 0.25, NumberType::DECIMAL),
-            ("-10,5", -10, -10.5, NumberType::DECIMAL),
-            ("1000,89", 1000, 1000.89, NumberType::DECIMAL),
-            (
-                "1.000,4564654654654",
-                1000,
-                1000.4564654654654,
-                NumberType::DECIMAL,
-            ),
-            (
-                "1.000,4564654654654",
-                1000,
-                1000.4564654654654,
-                NumberType::DECIMAL,
-            ),
-        ];
-        test_number(Some(Culture::Italian), list);
-    }
-
-    fn test_number(culture: Option<Culture>, list: Vec<(&str, i32, f32, NumberType)>) {
-        for (string_num, int_value, float_value, number_type) in list {
-            let convert = ConvertString::new(string_num, culture.to_owned());
-
-            //All input are valid number
-            assert_eq!(convert.is_numeric(), true, "Numeric number expected");
-            assert_eq!(
-                convert.is_integer(),
-                number_type == NumberType::WHOLE,
-                "Number should be a {}",
-                if number_type == NumberType::WHOLE {
-                    "integer"
-                } else {
-                    "decimal"
-                }
-            );
-            assert_eq!(
-                convert.is_float(),
-                number_type == NumberType::DECIMAL,
-                "Number should be a {}",
-                if number_type == NumberType::WHOLE {
-                    "integer"
-                } else {
-                    "float"
-                }
-            );
-
-            let to_integer = convert.to_number::<i32>();
-            if number_type == NumberType::WHOLE {
-                assert!(to_integer.is_ok(), "to_number() return Err instead of Ok");
-                assert_eq!(
-                    convert.to_number::<i32>().unwrap(),
-                    int_value,
-                    "to_integer() conversion failed for {}",
-                    string_num
-                );
-            } else {
-                assert!(to_integer.is_err(), "to_number() return Ok instead of Err");
-                assert_eq!(
-                    convert.to_number::<i32>(),
-                    Err(ConversionError::UnableToConvertStringToNumber)
-                );
-            }
-
-            let to_float = convert.to_number::<f32>();
-            assert!(to_float.is_ok(), "to_float() return Err instead of Ok");
-            assert_eq!(
-                convert.to_number::<f32>().unwrap(),
-                float_value,
-                "to_float() conversion failed for {}",
-                string_num
-            );
-        }
-    }
-
-    #[test]
-    fn test_number_unauthorized() {
-        let list = vec!["1..0", "1.,0", ",1.0", "+-0.2", "20 00", "-0,2245,45"];
-        let cultures = &vec![
-            None,
-            Some(Culture::English),
-            Some(Culture::French),
-            Some(Culture::Italian),
-        ];
-
-        for string_num in list {
-            for culture in cultures.into_iter() {
-                let convert = ConvertString::new(string_num, culture.to_owned());
-                assert_eq!(convert.is_numeric(), false, "Numeric shouldn't be parsed");
-            }
-        }
-    }
-
-    #[test]
-    pub fn test_number_to_format_integer() {
-        let integers = vec![
-            (2000i64, Culture::English, "2,000"),
-            (2000, Culture::French, "2 000"),
-            (2000, Culture::Italian, "2.000"),
-            (-2000, Culture::English, "-2,000"),
-            (-2000, Culture::French, "-2 000"),
-            (-2000, Culture::Italian, "-2.000"),
-        ];
-
-        for (number, culture, to_string_format) in integers {
-            assert_eq!(
-                number.to_format("N0", &culture).unwrap(),
-                String::from(to_string_format)
-            );
-        }
-    }
-
-    #[test]
-    pub fn test_number_to_format_float() {
-        let floats = vec![
-            (2_000.98, Culture::English, "2,000.98"),
-            (-2_000.98, Culture::French, "-2 000,98"),
-            (2_000.98, Culture::Italian, "2.000,98"),
-            (049_490.8257, Culture::English, "49,490.83"),
-        ];
-
-        for (number, culture, to_string_format) in floats {
-            assert_eq!(
-                number.to_format("N2", &culture).unwrap(),
-                String::from(to_string_format)
-            );
-        }
-    }
 }
-
-// macro_rules! impl_from {
-//     ($T:ty, $from_ty:path) => {
-//         impl From<$T> for Decimal {
-//             #[inline]
-//             fn from(t: $T) -> Decimal {
-//                 $from_ty(t).unwrap()
-//             }
-//         }
-//     }
-// }
-
-// impl_from!(isize, FromPrimitive::from_isize);
-// impl_from!(i8, FromPrimitive::from_i8);
-// impl_from!(i16, FromPrimitive::from_i16);
-// impl_from!(i32, FromPrimitive::from_i32);
-// impl_from!(i64, FromPrimitive::from_i64);
-// impl_from!(usize, FromPrimitive::from_usize);
-// impl_from!(u8, FromPrimitive::from_u8);
-// impl_from!(u16, FromPrimitive::from_u16);
-// impl_from!(u32, FromPrimitive::from_u32);
-// impl_from!(u64, FromPrimitive::from_u64);

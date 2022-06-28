@@ -1,12 +1,11 @@
 use crate::Culture;
-use crate::Num;
 use std::{fmt::Display, str::FromStr};
 
 use log::info;
 use log::{trace, warn};
 use regex::Regex;
 
-use crate::{errors::ConversionError, number::Number, pattern::NumberCultureSettings};
+use crate::{errors::ConversionError, pattern::NumberCultureSettings};
 
 pub trait NumberConversion {
     /// Try to convert a common string (not culture dependent)
@@ -37,14 +36,6 @@ pub trait NumberConversion {
 //         &self,
 //         culture: Culture,
 //     ) -> Result<N, ConversionError>;
-// }
-
-// pub trait IntegerConversion<I: num::Integer + Display> {
-//     fn to_integer(&self) -> Result<Number<I>, ConversionError>;
-// }
-
-// pub trait FloatConversion<F: num::Float + Display> {
-//     fn to_float(&self) -> Result<Number<F>, ConversionError>;
 // }
 
 /// Structure which represent a string number (can be either well formated or bad formated)
@@ -232,26 +223,6 @@ impl NumberConversion for StringNumber {
         self.to_number()
     }
 }
-
-/// Convert the string number to integer
-// impl IntegerConversion<i32> for StringNumber {
-//     fn to_integer(&self) -> Result<Number<i32>, ConversionError> {
-//         Ok(Number::new(self.clean().parse::<f32>().map_err(|e| {
-//             warn!("{}", e.to_string());
-//             ConversionError::UnableToConvertStringToNumber
-//         })? as i32))
-//     }
-// }
-
-// /// Convert the string number to float
-// impl FloatConversion<f32> for StringNumber {
-//     fn to_float(&self) -> Result<Number<f32>, ConversionError> {
-//         Ok(Number::new(self.clean().parse::<f32>().map_err(|e| {
-//             warn!("{}", e.to_string());
-//             ConversionError::UnableToConvertStringToNumber
-//         })?))
-//     }
-// }
 
 #[cfg(test)]
 mod tests {

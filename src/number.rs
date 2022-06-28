@@ -1,16 +1,13 @@
+use crate::pattern::ConvertString;
 use crate::number_conversion::NumberConversion;
 use crate::pattern::Separator;
 use crate::ConversionError;
-use crate::ConvertString;
 use crate::Culture;
-use crate::FormatOption;
 use crate::NumberCultureSettings;
 use crate::Regex;
 use log::error;
 use log::trace;
-use log::warn;
 use num::Num;
-use std::fmt::format;
 use std::fmt::Display;
 use thousands::Separable;
 
@@ -20,6 +17,12 @@ use thousands::Separable;
 /// The max is N9 digit
 /// And the culture parameter is use to display with the selected culture (it automatically
 /// apply the thousand and decimal separator of the given culture)
+/// # Example
+/// ```
+/// use num_string::{Culture, ToFormat};
+///     assert_eq!(1000.to_format("N0", &Culture::English).unwrap(), "1,000");
+///     assert_eq!(1000.to_format("N2", &Culture::French).unwrap(), "1 000,00");
+/// ```
 pub trait ToFormat {
     fn to_format(self, format: &str, culture: &Culture) -> Result<String, ConversionError>;
 }
@@ -102,11 +105,6 @@ impl<T: num::Num + Display> Number<T> {
 
         Ok(chars[1].to_string().as_str().to_number::<u8>()?)
     }
-
-    /// Return number to the current default culture format
-    // pub fn to_format(&self, culture: &Culture) -> Result<String, ConversionError> {
-    //     self.to_format_options(culture, FormatOption::new(2, 2))
-    // }
 
     /// Apply the thousand separator to the whole number given in parameter
     /// Thanks to thousands crate 
@@ -242,9 +240,35 @@ impl<T: num::Num + Display> Display for Number<T> {
     }
 }
 
+/// Structure with the nb decimal required when display a number to string
+#[derive(Debug)]
+pub struct FormatOption {
+    minimum_fraction_digit: u8,
+    maximum_fraction_digit: u8,
+}
+
+impl FormatOption {
+    pub fn new(minimum_fraction_digit: u8, maximum_fraction_digit: u8) -> FormatOption {
+        FormatOption {
+            minimum_fraction_digit,
+            maximum_fraction_digit,
+        }
+    }
+}
+
+impl Default for FormatOption {
+    fn default() -> Self {
+        Self {
+            minimum_fraction_digit: 2,
+            maximum_fraction_digit: 2,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{number::ToFormat, Culture, FormatOption, errors::ConversionError};
+    use crate::number::FormatOption;
+use crate::{number::ToFormat, Culture, errors::ConversionError};
     use super::Number;
 
     /// Test of 'to_format' function to display number to string with integer values
