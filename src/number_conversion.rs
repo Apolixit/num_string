@@ -1,8 +1,7 @@
 use crate::Culture;
 use std::{fmt::Display, str::FromStr};
 
-use log::info;
-use log::{trace, warn};
+use log::{trace, info};
 use regex::Regex;
 
 use crate::{errors::ConversionError, pattern::NumberCultureSettings};
@@ -39,7 +38,7 @@ pub trait NumberConversion {
 // }
 
 /// Structure which represent a string number (can be either well formated or bad formated)
-pub struct StringNumber {
+struct StringNumber {
     value: String,
     number_culture_settings: Option<NumberCultureSettings>,
 }
@@ -94,8 +93,9 @@ impl StringNumber {
         cleaned_input.to_string()
     }
 
-    /// Create regex from struct to clean the string
-    /// Return the string cleaned
+    /// Create regex from struct to clean the string.
+    /// 
+    /// Return the string cleaned.
     pub fn clean(&self) -> String {
         info!(
             "Clean with string input = {} and separators = {:?}",
@@ -152,13 +152,6 @@ impl StringNumber {
         );
         string_value
     }
-
-    pub fn split_number<T: num::Num + Display>(num: T) -> (String, String) {
-        let regex = Regex::new(r"[0-9]+([\.])([0-9]+)").unwrap();
-
-        regex.captures(num.to_string().as_str());
-        todo!()
-    }
 }
 
 impl NumberConversion for &str {
@@ -204,7 +197,7 @@ impl NumberConversion for StringNumber {
 
     fn to_number_separators<N>(
         &self,
-        pattern: NumberCultureSettings,
+        _pattern: NumberCultureSettings,
     ) -> std::result::Result<N, ConversionError>
     where
         N: num::Num,
@@ -229,16 +222,16 @@ mod tests {
     use crate::{
         errors::ConversionError,
         number_conversion::{NumberConversion, StringNumber},
-        pattern::{NumberCultureSettings, Separator},
+        pattern::{NumberCultureSettings},
     };
 
-    fn DOT_COMMA() -> NumberCultureSettings {
+    fn dot_comma() -> NumberCultureSettings {
         NumberCultureSettings::from((".", ","))
     }
-    fn COMMA_DOT() -> NumberCultureSettings {
+    fn comma_dot() -> NumberCultureSettings {
         NumberCultureSettings::from((",", "."))
     }
-    fn SPACE_COMMA() -> NumberCultureSettings {
+    fn space_comma() -> NumberCultureSettings {
         NumberCultureSettings::from((" ", ","))
     }
     
@@ -286,28 +279,28 @@ mod tests {
     fn number_conversion_others() {
         assert_eq!(
             "10.000.000"
-                .to_number_separators::<i32>(DOT_COMMA())
+                .to_number_separators::<i32>(dot_comma())
                 .unwrap(),
             10_000_000
         );
 
         assert_eq!(
             "10,000,000"
-                .to_number_separators::<i32>(COMMA_DOT())
+                .to_number_separators::<i32>(comma_dot())
                 .unwrap(),
             10_000_000
         );
 
         assert_eq!(
             "1.000,45"
-                .to_number_separators::<f64>(DOT_COMMA())
+                .to_number_separators::<f64>(dot_comma())
                 .unwrap(),
             1_000.45
         );
 
         assert_eq!(
             "1.000"
-                .to_number_separators::<i32>(DOT_COMMA())
+                .to_number_separators::<i32>(dot_comma())
                 .unwrap(),
             1_000
         );
@@ -365,13 +358,13 @@ mod tests {
     fn number_error_conversion() {
         assert_eq!(
             "10,000,000"
-                .to_number_separators::<i32>(SPACE_COMMA()),
+                .to_number_separators::<i32>(space_comma()),
             Err(ConversionError::UnableToConvertStringToNumber)
         );
 
         assert_eq!(
             "10,00,00,00"
-                .to_number_separators::<i32>(SPACE_COMMA()),
+                .to_number_separators::<i32>(space_comma()),
             Err(ConversionError::UnableToConvertStringToNumber)
         );
         assert_eq!(

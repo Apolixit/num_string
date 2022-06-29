@@ -1,62 +1,107 @@
+//! This crate perform conversion between string and number
+//! 
+//! It allows to convert culture formated number to rust number
+//! 
+//! It allows to display rust numbers to culture formated string
+//! 
+//! # Example string to number
+//! 
+//! ## Basic string to number
+//! 
+//! ``` rust
+//! use num_string::{Culture, ConversionError, NumberConversion};
+//!     assert_eq!("1000".to_number::<i32>().unwrap(), 1000);
+//!     assert_eq!("+1000".to_number::<i64>().unwrap(), 1000);
+//!     assert_eq!("-1000".to_number::<i64>().unwrap(), -1000);
+//!     assert_eq!("1000".to_number::<f32>().unwrap(), 1000.0);
+//!     assert_eq!("1000.5822".to_number::<f32>().unwrap(), 1000.5822);
+//!     
+//!     // Fail because 1000 > i8 max capacity
+//!     assert_eq!("1000".to_number::<i8>(), Err(ConversionError::UnableToConvertStringToNumber));
+//! ```
+//! 
+//! ## For more advanced conversion you can specify culture
+//! 
+//! ``` rust
+//! use num_string::{Culture, NumberConversion};     
+//!     // Numbers with decimal separator
+//!     assert_eq!("10.8888".to_number_culture::<f32>(Culture::English).unwrap(), 10.8888);
+//!     assert_eq!("0,10".to_number_culture::<f32>(Culture::Italian).unwrap(), 0.1); 
+//! 
+//!     // Numbers with decimal separator and no whole part
+//!     assert_eq!(",10".to_number_culture::<f32>(Culture::Italian).unwrap(), 0.1); 
+//! 
+//!     // Numbers with thousand separator
+//!     assert_eq!("1,000".to_number_culture::<i32>(Culture::English).unwrap(), 1000);     
+//! 
+//!     // Numbers with thousand and decimal separator
+//!     assert_eq!("1,000.8888".to_number_culture::<f32>(Culture::English).unwrap(), 1000.8888);
+//!     assert_eq!("-10 564,10".to_number_culture::<f32>(Culture::French).unwrap(), -10564.10);
+//! ```
+//! 
+//! ## Custom separator (DOT as thousand separator and SPACE a decimal separator)
+//! 
+//! ``` rust
+//! use num_string::{NumberCultureSettings, Separator, NumberConversion};
+//! 
+//!     assert_eq!(
+//!             "1.000 8888"
+//!                 .to_number_separators::<f32>(NumberCultureSettings::new(
+//!                     Separator::DOT,
+//!                     Separator::SPACE
+//!                 ))
+//!                 .unwrap(),
+//!             1000.8888
+//!         );
+//! ```
+//! 
+//! # Example number to string
+//! 
+//! ``` rust
+//! use num_string::{Culture, ToFormat}; 
+//!     // Some basic display (N0 = 0 digit, N2 = 2 digits etc)
+//!     assert_eq!(1000.to_format("N0", Culture::English).unwrap(), "1,000");
+//!     assert_eq!((-1000).to_format("N0", Culture::English).unwrap(), "-1,000");
+//!     assert_eq!(1000.to_format("N2", Culture::French).unwrap(), "1 000,00");
+//! 
+//!     // Perform the round decimal
+//!     assert_eq!(10_000.9999.to_format("N2", Culture::French).unwrap(), "10 001,00");
+//!     assert_eq!((-10_000.999).to_format("N2", Culture::French).unwrap(), "-10 001,00");
+//! ```
+//! 
+//! # Example of number analysis
+//! 
+//! ``` rust
+//! use num_string::{ConvertString, Culture};
+//! use num_string::pattern::TypeParsing; 
+//!     let string_num = ConvertString::new("1,000.2", Some(Culture::English));
+//!     assert!(string_num.is_numeric());
+//!     assert!(string_num.is_float());
+//!     assert!(!string_num.is_integer()); 
+//! 
+//!     // Convert to number
+//!     assert_eq!(string_num.to_number::<f32>().unwrap(), 1000.2); 
+//!     
+//!     // If the conversion is ok (string_num.isNumeric() == true), you will have access to the matching pattern
+//!     let matching_pattern = string_num.get_current_pattern().unwrap();
+//!     assert_eq!(matching_pattern.get_regex().get_type_parsing(), &TypeParsing::DecimalThousandSeparator); 
+//! 
+//!     // If we try to convert a bad formatted number
+//!     let string_error = ConvertString::new("NotANumber", Some(Culture::English));
+//!     assert!(!string_error.is_numeric());
+//! ```
+
 use regex::Regex;
 
-mod errors;
-mod number;
-mod number_conversion;
-mod pattern;
+pub mod errors;
+pub mod number;
+pub mod number_conversion;
+pub mod pattern;
 
+pub use errors::ConversionError;
 pub use number::ToFormat;
 pub use number_conversion::NumberConversion;
-pub use errors::ConversionError;
-pub use pattern::{NumberCultureSettings, Separator};
-
-
-/// This crate perform conversion between string and number
-/// It allows to convert culture formated number to Rust number
-/// And it allowed to display Rust numbers to culture formated string
-/// 
-/// Here some basic utilisation :
-/// # Example string to number
-/// 
-/// ## Basic string to number
-/// ```
-/// use num_string::{Culture, ConversionError, NumberConversion};
-/// 
-///     // Basic string number
-///     assert_eq!("1000".to_number::<i32>().unwrap(), 1000);
-///     assert_eq!("+1000".to_number::<i64>().unwrap(), 1000);
-///     assert_eq!("-1000".to_number::<i64>().unwrap(), -1000);
-///     assert_eq!("1000".to_number::<f32>().unwrap(), 1000.0);
-///
-///     // Fail because 1000 > i8 capacity
-///     assert_eq!("1000".to_number::<i8>(), Err(ConversionError::UnableToConvertStringToNumber));
-/// ```
-/// 
-/// ## For more advanced conversion you can specify culture
-/// ```
-/// use num_string::{Culture, NumberConversion};
-///     assert_eq!("1,000.8888".to_number_culture::<f32>(Culture::English).unwrap(), 1000.8888);
-///     assert_eq!("-10 564,10".to_number_culture::<f32>(Culture::French).unwrap(), -10564.10);
-/// ```
-/// 
-/// ## You can also specify some custom (DOT as thousand separator and SPACE a decimal separator)
-/// ```
-/// use num_string::{NumberCultureSettings, Separator, NumberConversion};
-///     assert_eq!("1.000 8888".to_number_separators::<f32>(NumberCultureSettings::new(Separator::DOT, Separator::SPACE)).unwrap(), 1000.8888);
-/// ```
-/// 
-/// # Example number to string
-/// ```
-/// use num_string::{Culture, ToFormat};
-///     // Some basic display
-///     assert_eq!(1000.to_format("N0", Culture::English).unwrap(), "1,000");
-///     assert_eq!(1000.to_format("N2", Culture::French).unwrap(), "1 000,00");
-/// 
-///     // Perform the round decimal
-///     assert_eq!(10000.9999.to_format("N2", Culture::French).unwrap(), "10 001,00");
-/// ```
-/// Please ref to other file for more advanced tests and explaination
-
+pub use pattern::{ConvertString, NumberCultureSettings, Separator};
 
 /// Represent the current "ConvertString" culture
 #[derive(PartialEq, Debug, Clone, Copy)]
@@ -81,7 +126,7 @@ impl TryFrom<&str> for Culture {
             "en" => Culture::English,
             "fr" => Culture::French,
             "it" => Culture::Italian,
-            _ => return Err(ConversionError::PatternCultureNotFound)
+            _ => return Err(ConversionError::PatternCultureNotFound),
         })
     }
 }
@@ -89,27 +134,31 @@ impl TryFrom<&str> for Culture {
 #[cfg(test)]
 mod tests {
 
-use crate::errors::ConversionError;
-use crate::number_conversion::NumberConversion;
-use crate::NumberCultureSettings;
-use crate::{
-        number::ToFormat,
-        pattern::{NumberType, Separator}, Culture,
-    };
+    use crate::errors::ConversionError;
+    use crate::number_conversion::NumberConversion;
+    use crate::{Culture, ToFormat};
 
     // Run this function before each test
     #[ctor::ctor]
     fn init() {
         env_logger::init();
     }
+
     #[test]
-    fn x() {
+    fn test_number_parsing_simple() {
         assert_eq!("1000".to_number::<i32>().unwrap(), 1000);
         assert_eq!(1000.to_format("N2", Culture::French).unwrap(), "1 000,00");
-        assert_eq!("1000".to_number::<i8>(), Err(ConversionError::UnableToConvertStringToNumber));
+        assert_eq!(
+            "1000".to_number::<i8>(),
+            Err(ConversionError::UnableToConvertStringToNumber)
+        );
         assert_eq!("1000".to_number::<f32>().unwrap(), 1000.0);
-        assert_eq!("1,000.8888".to_number_culture::<f32>(Culture::English).unwrap(), 1000.8888);
-        
+        assert_eq!(
+            "1,000.8888"
+                .to_number_culture::<f32>(Culture::English)
+                .unwrap(),
+            1000.8888
+        );
     }
 
     #[test]
@@ -138,8 +187,9 @@ use crate::{
             (-2_000.98, Culture::French, "-2 000,98"),
             (2_000.98, Culture::Italian, "2.000,98"),
             (049_490.8257, Culture::English, "49,490.83"),
+            (10_000.9999, Culture::French, "10 001,00"),
+            (-10_000.999, Culture::French, "-10 001,00"),
         ];
-
         for (number, culture, to_string_format) in floats {
             assert_eq!(
                 number.to_format("N2", culture).unwrap(),

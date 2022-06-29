@@ -324,7 +324,7 @@ use crate::{number::ToFormat, Culture, errors::ConversionError};
     #[test]
     pub fn str_to_format_float() {
         let vals_f64 = vec![
-            (1000.48, "N0", Culture::French, "1 000"),
+            (1000.48f64, "N0", Culture::French, "1 000"),
             (10000.48, "N2", Culture::French, "10 000,48"),
             (10000.99, "N4", Culture::English, "10,000.9900"),
             (-1000.98, "N0", Culture::Italian, "-1.001"),
@@ -341,7 +341,16 @@ use crate::{number::ToFormat, Culture, errors::ConversionError};
                 val_f64.to_format(to_format, culture).unwrap(),
                 string_result
             );
-        }
+        }   
+    }
+
+    #[test]
+    pub fn test_round_format() {
+        assert_eq!(1000.66666.to_format("N2", Culture::French).unwrap(), "1 000,67");
+        assert_eq!((-1000.66666).to_format("N2", Culture::French).unwrap(), "-1 000,67");
+
+        assert_eq!(1000.999.to_format("N2", Culture::French).unwrap(), "1 001,00");
+        assert_eq!((-1000.999).to_format("N2", Culture::French).unwrap(), "-1 001,00");
     }
 
     /// Test of 'apply_decimal_format' function

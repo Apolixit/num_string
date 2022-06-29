@@ -1,10 +1,10 @@
-use std::str::FromStr;
 use crate::errors::ConversionError;
-use crate::Culture;
 use crate::number_conversion::NumberConversion;
+use crate::Culture;
 use log::{info, warn};
 use regex::Regex;
 use std::fmt::Display;
+use std::str::FromStr;
 
 /// Represent if the number is Whole (int), or Decimal (float)
 #[derive(Debug, Clone, PartialEq)]
@@ -25,7 +25,8 @@ impl From<&TypeParsing> for NumberType {
 }
 
 /// Represent commons separators.
-/// Can be thousand or decimal separator
+/// 
+/// Can be thousand or decimal separator.
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum Separator {
     SPACE,
@@ -76,7 +77,7 @@ impl TryFrom<&str> for Separator {
     }
 }
 
-/// The number type
+/// The type of parsing. Represent all kind of basic number format
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeParsing {
     /**
@@ -204,16 +205,23 @@ impl RegexPattern {
             Regex::new(format!("{}{}{}", self.prefix, self.content, self.suffix).as_str()).unwrap();
         full_regex.is_match(text)
     }
+
+    pub fn get_type_parsing(&self) -> &TypeParsing {
+        &self.type_parsing
+    }
+
+    pub fn get_regex(&self) -> Regex {
+        Regex::new(format!("{}{}{}", self.prefix, self.content, self.suffix).as_str()).unwrap()
+    }
 }
+
 
 /// The parsing pattern wrapper
 #[derive(Debug, Clone)]
 pub struct ParsingPattern {
     name: String,
-    culture_settings: Option<NumberCultureSettings>,
     regex: RegexPattern,
     number_type: NumberType,
-    additional_pattern: Option<String>,
 }
 
 impl Display for ParsingPattern {
@@ -230,10 +238,8 @@ impl ParsingPattern {
     ) -> Result<ParsingPattern, ConversionError> {
         Ok(ParsingPattern {
             name: format!("{}_{}", name.to_uppercase(), &type_parsing),
-            culture_settings: culture_settings,
             regex: RegexPattern::new(&type_parsing, culture_settings)?,
             number_type: NumberType::from(&type_parsing),
-            additional_pattern: None,
         })
     }
 
@@ -477,7 +483,7 @@ impl ConvertString {
     }
 
     /// Return the pattern selected for conversion
-    fn get_current_pattern(&self) -> Option<ParsingPattern> {
+    pub fn get_current_pattern(&self) -> Option<ParsingPattern> {
         ConvertString::find_pattern(
             &self.string_num,
             &self.culture.unwrap_or_default(),
@@ -486,7 +492,10 @@ impl ConvertString {
     }
 
     /// Get culture pattern from culture
-    pub fn find_culture_pattern(culture: &Culture, patterns: &NumberPatterns) -> Option<CulturePattern> {
+    pub fn find_culture_pattern(
+        culture: &Culture,
+        patterns: &NumberPatterns,
+    ) -> Option<CulturePattern> {
         patterns
             .get_all_culture_pattern()
             .into_iter()
@@ -560,12 +569,12 @@ impl ConvertString {
 
 #[cfg(test)]
 mod tests {
-    use crate::pattern::CulturePattern;
-use crate::pattern::ConvertString;
-use super::NumberPatterns;
+    use super::NumberPatterns;
     use super::NumberType;
     use super::Separator;
     use crate::errors::ConversionError;
+    use crate::pattern::ConvertString;
+    use crate::pattern::CulturePattern;
     use crate::pattern::TypeParsing;
     use crate::Culture;
     use crate::NumberCultureSettings;
@@ -573,10 +582,22 @@ use super::NumberPatterns;
 
     #[test]
     fn test_number_type() {
-        assert_eq!(NumberType::DECIMAL, NumberType::from(&TypeParsing::DecimalSimple));
-        assert_eq!(NumberType::DECIMAL, NumberType::from(&TypeParsing::DecimalThousandSeparator));
-        assert_eq!(NumberType::DECIMAL, NumberType::from(&TypeParsing::DecimalWithoutWholePart));
-        assert_eq!(NumberType::WHOLE, NumberType::from(&TypeParsing::WholeSimple));
+        assert_eq!(
+            NumberType::DECIMAL,
+            NumberType::from(&TypeParsing::DecimalSimple)
+        );
+        assert_eq!(
+            NumberType::DECIMAL,
+            NumberType::from(&TypeParsing::DecimalThousandSeparator)
+        );
+        assert_eq!(
+            NumberType::DECIMAL,
+            NumberType::from(&TypeParsing::DecimalWithoutWholePart)
+        );
+        assert_eq!(
+            NumberType::WHOLE,
+            NumberType::from(&TypeParsing::WholeSimple)
+        );
     }
 
     #[test]
@@ -589,8 +610,11 @@ use super::NumberPatterns;
     fn test_separator() {
         let comma_str: &str = Separator::COMMA.into();
         assert_eq!(",", comma_str);
-        assert_eq!(Separator::SPACE,  Separator::try_from(" ").unwrap());
-        assert_eq!(Err(ConversionError::SeparatorNotFound), Separator::try_from("i_am_not_well_formatted"));
+        assert_eq!(Separator::SPACE, Separator::try_from(" ").unwrap());
+        assert_eq!(
+            Err(ConversionError::SeparatorNotFound),
+            Separator::try_from("i_am_not_well_formatted")
+        );
 
         assert_eq!(Separator::DOT.to_owned_string(), String::from("."));
 
@@ -806,8 +830,14 @@ use super::NumberPatterns;
     #[test]
     fn test_number_culture_settings() {
         //NumberCultureSettings
-        assert_eq!(NumberCultureSettings::from((" ", ",")), NumberCultureSettings::french_culture());
-        assert_eq!(NumberCultureSettings::from(Culture::English), NumberCultureSettings::english_culture());
+        assert_eq!(
+            NumberCultureSettings::from((" ", ",")),
+            NumberCultureSettings::french_culture()
+        );
+        assert_eq!(
+            NumberCultureSettings::from(Culture::English),
+            NumberCultureSettings::english_culture()
+        );
     }
 
     #[test]
@@ -976,6 +1006,4 @@ use super::NumberPatterns;
             }
         }
     }
-
-    
 }
