@@ -4,9 +4,9 @@
 //! 
 //! It allows to display rust numbers to culture formated string
 //! 
-//! # Example string to number
+//! ## Example string to number
 //! 
-//! ## Basic string to number
+//! ### Basic string to number
 //! 
 //! ``` rust
 //! use num_string::{Culture, ConversionError, NumberConversion};
@@ -20,7 +20,7 @@
 //!     assert_eq!("1000".to_number::<i8>(), Err(ConversionError::UnableToConvertStringToNumber));
 //! ```
 //! 
-//! ## For more advanced conversion you can specify culture
+//! ### For more advanced conversion you can specify culture
 //! 
 //! ``` rust
 //! use num_string::{Culture, NumberConversion};     
@@ -39,7 +39,7 @@
 //!     assert_eq!("-10 564,10".to_number_culture::<f32>(Culture::French).unwrap(), -10564.10);
 //! ```
 //! 
-//! ## Custom separator (DOT as thousand separator and SPACE a decimal separator)
+//! ### Custom separator (DOT as thousand separator and SPACE a decimal separator)
 //! 
 //! ``` rust
 //! use num_string::{NumberCultureSettings, Separator, NumberConversion};
@@ -55,7 +55,7 @@
 //!         );
 //! ```
 //! 
-//! # Example number to string
+//! ## Example number to string
 //! 
 //! ``` rust
 //! use num_string::{Culture, ToFormat}; 
@@ -69,7 +69,7 @@
 //!     assert_eq!((-10_000.999).to_format("N2", Culture::French).unwrap(), "-10 001,00");
 //! ```
 //! 
-//! # Example of number analysis
+//! ## Example of number analysis
 //! 
 //! ``` rust
 //! use num_string::{ConvertString, Culture};
