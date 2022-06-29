@@ -1,4 +1,4 @@
-//! This crate perform conversion between string and number
+//! Perform conversion between string and number
 //! 
 //! It allows to convert culture formated number to rust number
 //! 

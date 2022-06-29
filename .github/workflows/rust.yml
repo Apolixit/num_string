@@ -1,4 +1,4 @@
-name: Rust num string
+name: Build
 on:
   push:
     branches: [ "master" ]

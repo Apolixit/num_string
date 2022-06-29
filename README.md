@@ -1,8 +1,8 @@
-# This crate perform conversion between string and number
+# Perform conversion between string and number
 
 [![made-with-rust](https://img.shields.io/badge/Made%20with-Rust-1f425f.svg)](https://www.rust-lang.org/)
-[![Build Status](https://github.com/image-rs/image/workflows/Rust%20CI/badge.svg)](https://github.com/Apolixit/num_string/actions)
-
+[![Build Status](https://github.com/Apolixit/num_string/actions/workflows/rust.yml/badge.svg)](https://github.com/Apolixit/num_string/actions)
+[![License:MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 It allows to convert culture formated number to rust number
 
