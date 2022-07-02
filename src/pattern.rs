@@ -25,7 +25,7 @@ impl From<&TypeParsing> for NumberType {
 }
 
 /// Represent commons separators.
-/// 
+///
 /// Can be thousand or decimal separator.
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum Separator {
@@ -85,19 +85,19 @@ pub enum TypeParsing {
      */
     WholeSimple,
     /**
-     * X[DecimalSeparator]XX / +X[DecimalSeparator]XX / -X[DecimalSeparator]XX
+     * X|DecimalSeparator|XX / +X|DecimalSeparator|XX / -X|DecimalSeparator|XX
      */
     DecimalSimple,
     /**
-     * [DecimalSeparator]XX / +[DecimalSeparator]XX / -[DecimalSeparator]XX
+     * |DecimalSeparator|XX / +|DecimalSeparator|XX / -|DecimalSeparator|XX
      */
     DecimalWithoutWholePart,
     /**
-     * X[ThousandSeparator]XXX / +X[ThousandSeparator]XXX / -X[ThousandSeparator]XXX
+     * X|ThousandSeparator|XXX / +X|ThousandSeparator|XXX / -X|ThousandSeparator|XXX
      */
     WholeThousandSeparator,
     /**
-     * X[ThousandSeparator]XXX[DecimalSeparator]XX / +X[ThousandSeparator]XXX[DecimalSeparator]XX / -X[ThousandSeparator]XXX[DecimalSeparator]XX
+     * X|ThousandSeparator|XXX|DecimalSeparator|XX / +X|ThousandSeparator|XXX|DecimalSeparator|XX / -X|ThousandSeparator|XXX|DecimalSeparator|XX
      */
     DecimalThousandSeparator,
 }

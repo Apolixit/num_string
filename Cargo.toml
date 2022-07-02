@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 author = ["Romain FRIOT <friotromain@gmail.com>"]
 license = "MIT"
+description = "A simple crate to perform conversion between string and number"
 readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
