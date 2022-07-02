@@ -6,6 +6,14 @@ use regex::Regex;
 
 use crate::{errors::ConversionError, pattern::NumberCultureSettings};
 
+/// Trait implemented to convert a string number to Rust number
+/// ``` rust
+/// use num_string::{Culture, ConversionError, NumberConversion};
+///     assert_eq!("1000".to_number::<i32>().unwrap(), 1000);
+///     assert_eq!("1000.5822".to_number::<f32>().unwrap(), 1000.5822);
+///
+///     assert_eq!("1,000.8888".to_number_culture::<f32>(Culture::English).unwrap(), 1000.8888);
+// ```
 pub trait NumberConversion {
     /// Try to convert a common string (not culture dependent)
     fn to_number<N: num::Num + Display + FromStr>(&self) -> Result<N, ConversionError>;
@@ -94,7 +102,7 @@ impl StringNumber {
     }
 
     /// Create regex from struct to clean the string.
-    /// 
+    ///
     /// Return the string cleaned.
     pub fn clean(&self) -> String {
         info!(
@@ -234,7 +242,7 @@ mod tests {
     fn space_comma() -> NumberCultureSettings {
         NumberCultureSettings::from((" ", ","))
     }
-    
+
     /// Simple integer conversion
     #[test]
     fn number_conversion_integer() {
@@ -309,7 +317,7 @@ mod tests {
     /// Conversion with i8 primitive
     #[test]
     fn number_conversion_primitive_dependent_i8() {
-        /* Reminder : 
+        /* Reminder :
         * i8 : [-128: 128]
         */
 
@@ -337,7 +345,7 @@ mod tests {
     /// Conversion with i16 primitive
     #[test]
     fn number_conversion_primitive_dependent_i16() {
-        /* Reminder : 
+        /* Reminder :
         * i16 : [-32768: 32768]
         */
         let i16_ok = "-10000";
@@ -353,7 +361,7 @@ mod tests {
             Err(ConversionError::UnableToConvertStringToNumber)
         );
     }
-    
+
     #[test]
     fn number_error_conversion() {
         assert_eq!(
