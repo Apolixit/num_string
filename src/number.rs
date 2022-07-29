@@ -109,7 +109,7 @@ impl<T: num::Num + Display> Number<T> {
     }
 
     /// Apply the thousand separator to the whole number given in parameter
-    /// Thanks to thousands crate 
+    /// Thanks to thousands crate
     /// Ref 'test_apply_thousand_separator'
     fn apply_thousand_separator(num: i32, culture: &Culture) -> String {
         let culture_settings = NumberCultureSettings::from(*culture);
@@ -152,7 +152,7 @@ impl<T: num::Num + Display> Number<T> {
                 options.maximum_fraction_digit
             );
             //Check if we need to round the whole part
-            let decimal_rounded = decimal_part as f64 / (10i32.pow(decimal_len as u32 - options.maximum_fraction_digit as u32) as f64); 
+            let decimal_rounded = decimal_part as f64 / (10i32.pow(decimal_len as u32 - options.maximum_fraction_digit as u32) as f64);
             if decimal_rounded.round() as u32 == 10u32.pow(options.maximum_fraction_digit as u32) {
                 trace!("Need to round the whole part up");
                 return Some(("0".repeat(options.maximum_fraction_digit as usize), true));
@@ -180,7 +180,7 @@ impl<T: num::Num + Display> Number<T> {
     ) -> Result<String, ConversionError> {
         trace!("format = {:?}", format);
         let (sign_string, whole_string, decimal_opt_string) = self.regex_read_number()?;
-        
+
         let calc_to_string = |sign_string, whole_string| -> String {
             Number::<T>::apply_thousand_separator(
                 ConvertString::new(format!("{}{}", sign_string, whole_string).as_str(), None)
@@ -342,11 +342,15 @@ use crate::{number::ToFormat, Culture, errors::ConversionError};
             (10000.99, "N4", Culture::English, "10,000.9900"),
             (-1000.98, "N0", Culture::Italian, "-1.001"),
             (-1000.66666, "N3", Culture::Italian, "-1.000,667"),
+            (-1000.66666, "N3", Culture::Indian, "-1,000.667"),
             (1., "N2", Culture::English, "1.00"),
             (2_000.98, "N0",  Culture::Italian, "2.001"),
             (2_000.98, "N2",  Culture::Italian, "2.000,98"),
             (2_000.98, "N3",  Culture::Italian, "2.000,980"),
             (2_000.9998888, "N3",  Culture::Italian, "2.001,000"),
+            (2_000.9998888, "N3",  Culture::Indian, "2,001.000"),
+            (10.48, "N2", Culture::Indian, "10.48"),
+            (100_000.48, "N2", Culture::Indian, "1,00,000.48"),
         ];
 
         for (val_f64, to_format, culture, string_result) in vals_f64 {
@@ -354,7 +358,7 @@ use crate::{number::ToFormat, Culture, errors::ConversionError};
                 val_f64.to_format(to_format, culture).unwrap(),
                 string_result
             );
-        }   
+        }
     }
 
     #[test]

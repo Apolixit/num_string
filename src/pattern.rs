@@ -95,7 +95,7 @@ impl From<ThousandGrouping> for &[u8] {
     fn from(val: ThousandGrouping) -> Self {
         match val {
             ThousandGrouping::ThreeBlock => &[3],
-            ThousandGrouping::TwoBlock => &[2],
+            ThousandGrouping::TwoBlock => &[3, 2],
         }
     }
 }
@@ -200,7 +200,7 @@ impl RegexPattern {
                                 r"[0-9]{3}"
                             )
                             .as_str(),
-                        )   
+                        )
                     },
                     ThousandGrouping::TwoBlock => {
                         Regex::new(
@@ -212,7 +212,7 @@ impl RegexPattern {
                             .thousand_separator
                             .to_string_regex(), r"[0-9]{3}){1}")
                             .as_str(),
-                        )   
+                        )
                     },
                 }
             },
@@ -235,7 +235,7 @@ impl RegexPattern {
                                     .to_string_regex()
                             )
                             .as_str(),
-                        )   
+                        )
                     },
                     ThousandGrouping::TwoBlock => {
                         Regex::new(
@@ -253,7 +253,7 @@ impl RegexPattern {
                         )
                     },
                 }
-                
+
             },
         }
         .map_err(|_| ConversionError::RegexBuilder)?;
@@ -397,7 +397,7 @@ impl From<(&str, &str, ThousandGrouping)> for NumberCultureSettings {
     fn from(val: (&str, &str, ThousandGrouping)) -> Self {
         let mut instance = NumberCultureSettings::from((val.0, val.1));
         instance.thousand_grouping = val.2;
-        
+
         instance
     }
 }

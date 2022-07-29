@@ -225,6 +225,9 @@ mod tests {
     fn comma_dot() -> NumberCultureSettings {
         NumberCultureSettings::from((",", ".", ThousandGrouping::ThreeBlock))
     }
+    fn comma_dot_grouping_two() -> NumberCultureSettings {
+        NumberCultureSettings::from((",", ".", ThousandGrouping::TwoBlock))
+    }
     fn space_comma() -> NumberCultureSettings {
         NumberCultureSettings::from((" ", ",", ThousandGrouping::ThreeBlock))
     }
@@ -283,6 +286,13 @@ mod tests {
                 .to_number_separators::<i32>(comma_dot())
                 .unwrap(),
             10_000_000
+        );
+
+        assert_eq!(
+            "10,00,00,00,000"
+                .to_number_separators::<i64>(comma_dot_grouping_two())
+                .unwrap(),
+            10_000_000_000
         );
 
         assert_eq!(
