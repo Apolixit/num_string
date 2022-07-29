@@ -31,20 +31,6 @@ pub trait NumberConversion {
     ) -> Result<N, ConversionError>;
 }
 
-// pub trait NumberConversionAdvanced {
-//     /// Try to convert a string with given thousand and decimal separator
-//     fn to_number_separators<N: num::Num + Display + FromStr>(
-//         &self,
-//         separators: NumberCultureSettings,
-//     ) -> Result<N, ConversionError>;
-
-//     /// Try to convert a string with given culture
-//     fn to_number_culture<N: num::Num + Display + FromStr>(
-//         &self,
-//         culture: Culture,
-//     ) -> Result<N, ConversionError>;
-// }
-
 /// Structure which represent a string number (can be either well formated or bad formated)
 struct StringNumber {
     value: String,
@@ -124,14 +110,14 @@ impl StringNumber {
         if self.has_settings() {
             trace!(
                 "Decimal ({}) and thousand ({}) separator has been specified",
-                &self.get_settings().unwrap().to_decimal_separator_string(),
-                &self.get_settings().unwrap().to_thousand_separator_string()
+                &self.get_settings().unwrap().into_decimal_separator_string(),
+                &self.get_settings().unwrap().into_thousand_separator_string()
             );
 
             trace!("Begin thousand separator replace");
             string_value = replace(
                 &string_value,
-                &self.get_settings().unwrap().to_thousand_separator_string(),
+                &self.get_settings().unwrap().into_thousand_separator_string(),
                 "",
             );
             trace!(
@@ -142,7 +128,7 @@ impl StringNumber {
             trace!("Begin decimal separator replace");
             string_value = replace(
                 &string_value,
-                &self.get_settings().unwrap().to_decimal_separator_string(),
+                &self.get_settings().unwrap().into_decimal_separator_string(),
                 StringNumber::string_decimal_replacement().as_str(),
             );
             trace!(
@@ -229,18 +215,18 @@ impl NumberConversion for StringNumber {
 mod tests {
     use crate::{
         errors::ConversionError,
-        number_conversion::{NumberConversion, StringNumber},
-        pattern::{NumberCultureSettings},
+        conversion::{NumberConversion, StringNumber},
+        pattern::{NumberCultureSettings, ThousandGrouping},
     };
 
     fn dot_comma() -> NumberCultureSettings {
-        NumberCultureSettings::from((".", ","))
+        NumberCultureSettings::from((".", ",", ThousandGrouping::ThreeBlock))
     }
     fn comma_dot() -> NumberCultureSettings {
-        NumberCultureSettings::from((",", "."))
+        NumberCultureSettings::from((",", ".", ThousandGrouping::ThreeBlock))
     }
     fn space_comma() -> NumberCultureSettings {
-        NumberCultureSettings::from((" ", ","))
+        NumberCultureSettings::from((" ", ",", ThousandGrouping::ThreeBlock))
     }
 
     /// Simple integer conversion
@@ -275,7 +261,7 @@ mod tests {
         for (string_value, float_value) in list {
             assert_eq!(
                 string_value
-                    .to_number_separators::<f64>(NumberCultureSettings::from((" ", ",")))
+                    .to_number_separators::<f64>(NumberCultureSettings::from((" ", ",", ThousandGrouping::ThreeBlock)))
                     .unwrap(),
                 float_value
             );

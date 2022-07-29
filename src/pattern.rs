@@ -1,5 +1,5 @@
 use crate::errors::ConversionError;
-use crate::number_conversion::NumberConversion;
+use crate::conversion::NumberConversion;
 use crate::Culture;
 use log::{info, warn};
 use regex::Regex;
@@ -32,6 +32,7 @@ pub enum Separator {
     SPACE,
     DOT,
     COMMA,
+    APOSTROPHE,
 }
 
 impl Separator {
@@ -40,6 +41,7 @@ impl Separator {
             Separator::COMMA => String::from(r"[\\,]"),
             Separator::DOT => String::from(r"[\\.]"),
             Separator::SPACE => String::from(r"[\s]"),
+            Separator::APOSTROPHE => String::from(r"[\\']"),
         }
     }
 
@@ -48,6 +50,7 @@ impl Separator {
             Separator::COMMA => String::from(","),
             Separator::DOT => String::from("."),
             Separator::SPACE => String::from(" "),
+            Separator::APOSTROPHE => String::from("'"),
         }
     }
 }
@@ -59,6 +62,7 @@ impl From<Separator> for &str {
             Separator::COMMA => ",",
             Separator::DOT => ".",
             Separator::SPACE => " ",
+            Separator::APOSTROPHE => "'",
         }
     }
 }
@@ -73,6 +77,25 @@ impl TryFrom<&str> for Separator {
             "." => Ok(Separator::DOT),
             " " => Ok(Separator::SPACE),
             _ => Err(ConversionError::SeparatorNotFound),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ThousandGrouping {
+    /// The standard grouping is the most common thousand split. We group the number by blocks of 3
+    /// Ex : X XXX XXX XXX
+    ThreeBlock,
+    /// Indian thousand split
+    TwoBlock
+}
+
+/// To be compatible with thousands crate
+impl From<ThousandGrouping> for &[u8] {
+    fn from(val: ThousandGrouping) -> Self {
+        match val {
+            ThousandGrouping::ThreeBlock => &[3],
+            ThousandGrouping::TwoBlock => &[2],
         }
     }
 }
@@ -134,6 +157,9 @@ impl RegexPattern {
             panic!("The regex pattern need to have culture settings set");
         }
 
+        //Indian
+        // ^[\-\+]?([0-9]{0,3})([,][0-9]{2})*([,][0-9]{3}){1}
+
         let regex_content = match type_parsing {
             TypeParsing::WholeSimple => Regex::new(r"[\-\+]?\d+([0-9]{3})*"),
             TypeParsing::DecimalSimple => Regex::new(
@@ -160,34 +186,75 @@ impl RegexPattern {
                 )
                 .as_str(),
             ),
-            TypeParsing::WholeThousandSeparator => Regex::new(
-                format!(
-                    "{}({}{})+",
-                    r"[\-\+]?[0-9]+",
-                    culture_settings
-                        .unwrap()
-                        .thousand_separator
-                        .to_string_regex(),
-                    r"[0-9]{3}"
-                )
-                .as_str(),
-            ),
-            TypeParsing::DecimalThousandSeparator => Regex::new(
-                format!(
-                    "{}({}{})+{}[0-9]*",
-                    r"[\-\+]?[0-9]+",
-                    culture_settings
-                        .unwrap()
-                        .thousand_separator
-                        .to_string_regex(),
-                    r"[0-9]{3}",
-                    culture_settings
-                        .unwrap()
-                        .decimal_separator
-                        .to_string_regex()
-                )
-                .as_str(),
-            ),
+            TypeParsing::WholeThousandSeparator => {
+                match culture_settings.unwrap().thousand_grouping {
+                    ThousandGrouping::ThreeBlock => {
+                        Regex::new(
+                            format!(
+                                "{}({}{})+",
+                                r"[\-\+]?[0-9]+",
+                                culture_settings
+                                    .unwrap()
+                                    .thousand_separator
+                                    .to_string_regex(),
+                                r"[0-9]{3}"
+                            )
+                            .as_str(),
+                        )   
+                    },
+                    ThousandGrouping::TwoBlock => {
+                        Regex::new(
+                            format!("{}{}{}{}{}", r"[\-\+]?([0-9]{0,3})(", culture_settings
+                            .unwrap()
+                            .thousand_separator
+                            .to_string_regex(), r"[0-9]{2})*(", culture_settings
+                            .unwrap()
+                            .thousand_separator
+                            .to_string_regex(), r"[0-9]{3}){1}")
+                            .as_str(),
+                        )   
+                    },
+                }
+            },
+            TypeParsing::DecimalThousandSeparator => {
+                // [\-\+]?([0-9]{0,3})([,][0-9]{2})*([,][0-9]{3}){1}
+                match culture_settings.unwrap().thousand_grouping {
+                    ThousandGrouping::ThreeBlock => {
+                        Regex::new(
+                            format!(
+                                "{}({}{})+{}[0-9]*",
+                                r"[\-\+]?[0-9]+",
+                                culture_settings
+                                    .unwrap()
+                                    .thousand_separator
+                                    .to_string_regex(),
+                                r"[0-9]{3}",
+                                culture_settings
+                                    .unwrap()
+                                    .decimal_separator
+                                    .to_string_regex()
+                            )
+                            .as_str(),
+                        )   
+                    },
+                    ThousandGrouping::TwoBlock => {
+                        Regex::new(
+                            format!("{}{}{}{}{}{}[0-9]*", r"[\-\+]?([0-9]{0,3})(", culture_settings
+                            .unwrap()
+                            .thousand_separator
+                            .to_string_regex(), r"[0-9]{2})*(", culture_settings
+                            .unwrap()
+                            .thousand_separator
+                            .to_string_regex(), r"[0-9]{3}){1}", culture_settings
+                            .unwrap()
+                            .decimal_separator
+                            .to_string_regex())
+                            .as_str(),
+                        )
+                    },
+                }
+                
+            },
         }
         .map_err(|_| ConversionError::RegexBuilder)?;
 
@@ -257,6 +324,7 @@ impl ParsingPattern {
 pub struct NumberCultureSettings {
     thousand_separator: Separator,
     decimal_separator: Separator,
+    thousand_grouping: ThousandGrouping,
 }
 
 impl NumberCultureSettings {
@@ -264,51 +332,73 @@ impl NumberCultureSettings {
     pub fn new(
         thousand_separator: Separator,
         decimal_separator: Separator,
+        thousand_grouping: ThousandGrouping,
     ) -> NumberCultureSettings {
         NumberCultureSettings {
-            thousand_separator: thousand_separator,
-            decimal_separator: decimal_separator,
+            thousand_separator,
+            decimal_separator,
+            thousand_grouping,
         }
     }
 
     /// Get English culture settings
     pub fn english_culture() -> NumberCultureSettings {
-        NumberCultureSettings::new(Separator::COMMA, Separator::DOT)
+        NumberCultureSettings::new(Separator::COMMA, Separator::DOT, ThousandGrouping::ThreeBlock)
     }
 
     /// Get French culture settings
     pub fn french_culture() -> NumberCultureSettings {
-        NumberCultureSettings::new(Separator::SPACE, Separator::COMMA)
+        NumberCultureSettings::new(Separator::SPACE, Separator::COMMA, ThousandGrouping::ThreeBlock)
     }
 
     /// Get Italian culture settings
     pub fn italian_culture() -> NumberCultureSettings {
-        NumberCultureSettings::new(Separator::DOT, Separator::COMMA)
+        NumberCultureSettings::new(Separator::DOT, Separator::COMMA, ThousandGrouping::ThreeBlock)
     }
 
-    pub fn to_thousand_separator(&self) -> &Separator {
-        &self.thousand_separator
+    /// Get Indian culture settings
+    pub fn indian_culture() -> NumberCultureSettings {
+        NumberCultureSettings::new(Separator::COMMA, Separator::DOT, ThousandGrouping::TwoBlock)
     }
 
-    pub fn to_thousand_separator_string(&self) -> String {
+    pub fn thousand_separator(&self) -> Separator {
+        self.thousand_separator
+    }
+
+    pub fn into_thousand_separator_string(&self) -> String {
         self.thousand_separator.to_owned_string()
     }
 
-    pub fn to_decimal_separator(&self) -> &Separator {
-        &self.decimal_separator
+    pub fn decimal_separator(&self) -> Separator {
+        self.decimal_separator
     }
 
-    pub fn to_decimal_separator_string(&self) -> String {
+    pub fn into_decimal_separator_string(&self) -> String {
         self.decimal_separator.to_owned_string()
     }
+
+    pub fn thousand_grouping(&self) -> ThousandGrouping {
+        self.thousand_grouping
+    }
 }
+
 
 impl From<(&str, &str)> for NumberCultureSettings {
     fn from(val: (&str, &str)) -> Self {
         NumberCultureSettings::new(
             Separator::try_from(val.0).unwrap(),
             Separator::try_from(val.1).unwrap(),
+            ThousandGrouping::ThreeBlock
         )
+    }
+}
+
+impl From<(&str, &str, ThousandGrouping)> for NumberCultureSettings {
+    fn from(val: (&str, &str, ThousandGrouping)) -> Self {
+        let mut instance = NumberCultureSettings::from((val.0, val.1));
+        instance.thousand_grouping = val.2;
+        
+        instance
     }
 }
 
@@ -319,6 +409,7 @@ impl From<Culture> for NumberCultureSettings {
             Culture::English => NumberCultureSettings::english_culture(),
             Culture::French => NumberCultureSettings::french_culture(),
             Culture::Italian => NumberCultureSettings::italian_culture(),
+            Culture::Indian => NumberCultureSettings::indian_culture(),
         }
     }
 }
@@ -575,6 +666,7 @@ mod tests {
     use crate::errors::ConversionError;
     use crate::pattern::ConvertString;
     use crate::pattern::CulturePattern;
+    use crate::pattern::ThousandGrouping;
     use crate::pattern::TypeParsing;
     use crate::Culture;
     use crate::NumberCultureSettings;
@@ -831,7 +923,7 @@ mod tests {
     fn test_number_culture_settings() {
         //NumberCultureSettings
         assert_eq!(
-            NumberCultureSettings::from((" ", ",")),
+            NumberCultureSettings::from((" ", ",", ThousandGrouping::ThreeBlock)),
             NumberCultureSettings::french_culture()
         );
         assert_eq!(

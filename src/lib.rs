@@ -95,12 +95,12 @@ use regex::Regex;
 
 pub mod errors;
 pub mod number;
-pub mod number_conversion;
+pub mod conversion;
 pub mod pattern;
 
 pub use errors::ConversionError;
 pub use number::ToFormat;
-pub use number_conversion::NumberConversion;
+pub use conversion::NumberConversion;
 pub use pattern::{ConvertString, NumberCultureSettings, Separator};
 
 /// Represent the current "ConvertString" culture
@@ -109,6 +109,7 @@ pub enum Culture {
     English,
     French,
     Italian,
+    Indian
 }
 
 /// Default culture = English
@@ -135,7 +136,7 @@ impl TryFrom<&str> for Culture {
 mod tests {
 
     use crate::errors::ConversionError;
-    use crate::number_conversion::NumberConversion;
+    use crate::conversion::NumberConversion;
     use crate::{Culture, ToFormat};
 
     // Run this function before each test

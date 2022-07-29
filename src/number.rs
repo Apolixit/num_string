@@ -1,5 +1,6 @@
+use crate::pattern::ThousandGrouping;
 use crate::pattern::ConvertString;
-use crate::number_conversion::NumberConversion;
+use crate::conversion::NumberConversion;
 use crate::pattern::Separator;
 use crate::ConversionError;
 use crate::Culture;
@@ -8,6 +9,7 @@ use crate::Regex;
 use log::error;
 use log::trace;
 use num::Num;
+use thousands::SeparatorPolicy;
 use std::fmt::Display;
 use thousands::Separable;
 
@@ -111,11 +113,12 @@ impl<T: num::Num + Display> Number<T> {
     /// Ref 'test_apply_thousand_separator'
     fn apply_thousand_separator(num: i32, culture: &Culture) -> String {
         let culture_settings = NumberCultureSettings::from(*culture);
-        match culture_settings.to_thousand_separator() {
-            Separator::COMMA => num.separate_with_commas(),
-            Separator::DOT => num.separate_with_dots(),
-            Separator::SPACE => num.separate_with_spaces(),
-        }
+
+        num.separate_by_policy(SeparatorPolicy {
+            separator: culture_settings.thousand_separator().into(),
+            groups: culture_settings.thousand_grouping().into(),
+            digits: thousands::digits::ASCII_DECIMAL
+        })
     }
 
     /// Apply the format option to the decimal part (which is currently manipulated as a whole integer)
@@ -209,7 +212,7 @@ impl<T: num::Num + Display> Number<T> {
             number_string = format!(
                 "{}{}{}",
                 number_string,
-                NumberCultureSettings::from(*culture).to_decimal_separator_string(),
+                NumberCultureSettings::from(*culture).into_decimal_separator_string(),
                 decimal_format
             );
         } else {
@@ -245,14 +248,23 @@ impl<T: num::Num + Display> Display for Number<T> {
 pub struct FormatOption {
     minimum_fraction_digit: u8,
     maximum_fraction_digit: u8,
+    thousand_grouping: ThousandGrouping,
 }
 
 impl FormatOption {
+    /// Create a new format option
     pub fn new(minimum_fraction_digit: u8, maximum_fraction_digit: u8) -> FormatOption {
         FormatOption {
             minimum_fraction_digit,
             maximum_fraction_digit,
+            thousand_grouping: ThousandGrouping::ThreeBlock
         }
+    }
+
+    /// Change the default grouping
+    pub fn with_grouping(mut self, thousand_grouping: ThousandGrouping) -> Self {
+        self.thousand_grouping = thousand_grouping;
+        self
     }
 }
 
@@ -261,6 +273,7 @@ impl Default for FormatOption {
         Self {
             minimum_fraction_digit: 2,
             maximum_fraction_digit: 2,
+            thousand_grouping: ThousandGrouping::ThreeBlock,
         }
     }
 }
@@ -380,6 +393,7 @@ use crate::{number::ToFormat, Culture, errors::ConversionError};
             (-2_000.98, Culture::French, "-2 001", FormatOption::new(0, 0)),
             (2_000.98, Culture::Italian, "2.000,980", FormatOption::new(3, 5)),
             (2_000.98, Culture::Italian, "2.000,98000", FormatOption::new(5, 5)),
+            (2000000.98, Culture::Indian, "20,00,000.98000", FormatOption::new(5, 5).with_grouping(crate::pattern::ThousandGrouping::TwoBlock)),
         ];
 
         for (number, culture, to_string_format, format) in floats {
@@ -453,6 +467,8 @@ use crate::{number::ToFormat, Culture, errors::ConversionError};
             (-1000000, Culture::English, "-1,000,000"),
             (1000, Culture::Italian, "1.000"),
             (-1000000, Culture::Italian, "-1.000.000"),
+            (100000, Culture::Indian, "1,00,000"),
+            (10000000, Culture::Indian, "1,00,00,000"),
         ];
 
         for (val_i32, culture, val_string) in values {
