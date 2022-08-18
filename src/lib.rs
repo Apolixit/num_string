@@ -48,12 +48,24 @@
 //!             "1.000 8888"
 //!                 .to_number_separators::<f32>(NumberCultureSettings::new(
 //!                     Separator::DOT,
-//!                     Separator::SPACE,
-//!                     ThousandGrouping::ThreeBlock
+//!                     Separator::SPACE
 //!                 ))
 //!                 .unwrap(),
 //!             1000.8888
 //!         );
+//! 
+//!         assert_eq!(
+//!        "1 00 00 000.50"
+//!            .to_number_separators::<f32>(
+//!                NumberCultureSettings::new(
+//!                    num_string::Separator::SPACE,
+//!                    num_string::Separator::DOT
+//!                )
+//!                .with_grouping(num_string::ThousandGrouping::TwoBlock)
+//!            )
+//!            .unwrap(),
+//!        10000000.5
+//!    );
 //! ```
 //!
 //! ## Example number to string
@@ -68,6 +80,7 @@
 //!     // Perform the round decimal
 //!     assert_eq!(10_000.9999.to_format("N2", Culture::French).unwrap(), "10 001,00");
 //!     assert_eq!((-10_000.999).to_format("N2", Culture::French).unwrap(), "-10 001,00");
+//! 
 //! ```
 //!
 //! ## Example of number analysis
@@ -95,13 +108,13 @@
 use regex::Regex;
 
 pub mod errors;
-pub mod number;
-pub mod conversion;
+pub mod number_to_string;
+pub mod string_to_number;
 pub mod pattern;
 
 pub use errors::ConversionError;
-pub use number::ToFormat;
-pub use conversion::NumberConversion;
+pub use number_to_string::ToFormat;
+pub use string_to_number::NumberConversion;
 pub use pattern::{ConvertString, NumberCultureSettings, Separator, ThousandGrouping};
 
 /// Represent the current "ConvertString" culture
@@ -111,6 +124,28 @@ pub enum Culture {
     French,
     Italian,
     Indian
+}
+
+impl Culture {
+    /// Get English culture settings
+    pub fn english_culture() -> NumberCultureSettings {
+        NumberCultureSettings::new(Separator::COMMA, Separator::DOT)
+    }
+
+    /// Get French culture settings
+    pub fn french_culture() -> NumberCultureSettings {
+        NumberCultureSettings::new(Separator::SPACE, Separator::COMMA)
+    }
+
+    /// Get Italian culture settings
+    pub fn italian_culture() -> NumberCultureSettings {
+        NumberCultureSettings::new(Separator::DOT, Separator::COMMA)
+    }
+
+    /// Get Indian culture settings
+    pub fn indian_culture() -> NumberCultureSettings {
+        NumberCultureSettings::new(Separator::COMMA, Separator::DOT).with_grouping(ThousandGrouping::TwoBlock)
+    }
 }
 
 /// Default culture = English
@@ -128,16 +163,20 @@ impl TryFrom<&str> for Culture {
             "en" => Culture::English,
             "fr" => Culture::French,
             "it" => Culture::Italian,
+            "id" => Culture::Indian,
             _ => return Err(ConversionError::PatternCultureNotFound),
         })
     }
 }
 
+// Tout ajouter dans NumberPatterns > culture_pattern
+
+
 #[cfg(test)]
 mod tests {
 
     use crate::errors::ConversionError;
-    use crate::conversion::NumberConversion;
+    use crate::string_to_number::NumberConversion;
     use crate::{Culture, ToFormat};
 
     // Run this function before each test
@@ -169,9 +208,11 @@ mod tests {
             (2000i64, Culture::English, "2,000"),
             (2000, Culture::French, "2 000"),
             (2000, Culture::Italian, "2.000"),
+            (2000, Culture::Indian, "2,000"),
             (-2000, Culture::English, "-2,000"),
             (-2000, Culture::French, "-2 000"),
             (-2000, Culture::Italian, "-2.000"),
+            (-2000, Culture::Indian, "-2,000"),
         ];
 
         for (number, culture, to_string_format) in integers {
@@ -188,9 +229,11 @@ mod tests {
             (2_000.98, Culture::English, "2,000.98"),
             (-2_000.98, Culture::French, "-2 000,98"),
             (2_000.98, Culture::Italian, "2.000,98"),
+            (2_000.98, Culture::Indian, "2,000.98"),
             (049_490.8257, Culture::English, "49,490.83"),
             (10_000.9999, Culture::French, "10 001,00"),
             (-10_000.999, Culture::French, "-10 001,00"),
+            (-10_000.999, Culture::Indian, "-10,001.00"),
         ];
         for (number, culture, to_string_format) in floats {
             assert_eq!(
@@ -216,6 +259,7 @@ mod tests {
             (1.0, "1.00", Culture::English),
             (100000000.10, "100.000.000,10", Culture::Italian),
             (-50.50, "-50,50", Culture::Italian),
+            (100000000.10, "10,00,00,000.10", Culture::Indian),
         ];
 
         for (val_f64, val_str, culture) in values_float {

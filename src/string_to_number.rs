@@ -1,7 +1,7 @@
 use crate::Culture;
 use std::{fmt::Display, str::FromStr};
 
-use log::{trace, info};
+use log::{trace, info, debug};
 use regex::Regex;
 
 use crate::{errors::ConversionError, pattern::NumberCultureSettings};
@@ -9,10 +9,12 @@ use crate::{errors::ConversionError, pattern::NumberCultureSettings};
 /// Trait implemented to convert a string number to Rust number
 /// ``` rust
 /// use num_string::{Culture, ConversionError, NumberConversion};
+/// use num_string::{pattern::{NumberCultureSettings, ThousandGrouping}, Separator};
+/// 
 ///     assert_eq!("1000".to_number::<i32>().unwrap(), 1000);
 ///     assert_eq!("1000.5822".to_number::<f32>().unwrap(), 1000.5822);
-///
 ///     assert_eq!("1,000.8888".to_number_culture::<f32>(Culture::English).unwrap(), 1000.8888);
+///     assert_eq!("-5'000.66".to_number_separators::<f32>(NumberCultureSettings::new(Separator::APOSTROPHE, Separator::DOT)).unwrap(), -5000.66);
 // ```
 pub trait NumberConversion {
     /// Try to convert a common string (not culture dependent)
@@ -74,8 +76,9 @@ impl StringNumber {
 
     /// Replace the string which match the regex by the replacement string
     fn replace_element(string_number: &str, string_regex: &str, replacement: &str) -> String {
-        let regex_space = Regex::new(format!(r"[\\{}]", string_regex).as_str()).unwrap();
-        trace!(
+        // let regex_space = Regex::new(format!(r"[\\{}]", string_regex).as_str()).unwrap();
+        let regex_space = Regex::new(string_regex).unwrap();
+        debug!(
             "Regex replace : {:?} / string_value = {} / string replacement = {}",
             regex_space,
             string_number,
@@ -101,14 +104,14 @@ impl StringNumber {
         let replace = |string_input: &str, separator: &str, replacement: &str| {
             StringNumber::replace_element(
                 string_input,
-                format!(r"{}", separator).as_str(),
+                separator, //format!(r"{}", separator).as_str(),
                 replacement,
             )
         };
 
         //Clean decimal and thousand separator if needed
         if self.has_settings() {
-            trace!(
+            debug!(
                 "Decimal ({}) and thousand ({}) separator has been specified",
                 &self.get_settings().unwrap().into_decimal_separator_string(),
                 &self.get_settings().unwrap().into_thousand_separator_string()
@@ -117,7 +120,7 @@ impl StringNumber {
             trace!("Begin thousand separator replace");
             string_value = replace(
                 &string_value,
-                &self.get_settings().unwrap().into_thousand_separator_string(),
+                &self.get_settings().unwrap().into_thousand_separator_regex(),
                 "",
             );
             trace!(
@@ -128,7 +131,7 @@ impl StringNumber {
             trace!("Begin decimal separator replace");
             string_value = replace(
                 &string_value,
-                &self.get_settings().unwrap().into_decimal_separator_string(),
+                &self.get_settings().unwrap().into_decimal_separator_regex(),
                 StringNumber::string_decimal_replacement().as_str(),
             );
             trace!(
@@ -139,7 +142,7 @@ impl StringNumber {
             string_value = replace(&string_value, r"\s", "");
         }
 
-        trace!(
+        debug!(
             "Input before clean = {} / after clean = {}",
             self.value,
             string_value
@@ -176,7 +179,7 @@ impl NumberConversion for &str {
         N: std::fmt::Display,
         N: std::str::FromStr,
     {
-        StringNumber::new_with_settings(String::from(*self), NumberCultureSettings::from(culture))
+        StringNumber::new_with_settings(String::from(*self), culture.into())
             .to_number()
     }
 }
@@ -213,25 +216,61 @@ impl NumberConversion for StringNumber {
 
 #[cfg(test)]
 mod tests {
+    use regex::escape;
+
     use crate::{
         errors::ConversionError,
-        conversion::{NumberConversion, StringNumber},
-        pattern::{NumberCultureSettings, ThousandGrouping},
+        string_to_number::{NumberConversion, StringNumber},
+        pattern::{NumberCultureSettings, ThousandGrouping}, Separator,
     };
 
     fn dot_comma() -> NumberCultureSettings {
-        NumberCultureSettings::from((".", ",", ThousandGrouping::ThreeBlock))
+        NumberCultureSettings::from((".", ","))
     }
     fn comma_dot() -> NumberCultureSettings {
-        NumberCultureSettings::from((",", ".", ThousandGrouping::ThreeBlock))
+        NumberCultureSettings::from((",", "."))
     }
     fn comma_dot_grouping_two() -> NumberCultureSettings {
-        NumberCultureSettings::from((",", ".", ThousandGrouping::TwoBlock))
+        NumberCultureSettings::from((",", ".")).with_grouping(ThousandGrouping::TwoBlock)
     }
     fn space_comma() -> NumberCultureSettings {
-        NumberCultureSettings::from((" ", ",", ThousandGrouping::ThreeBlock))
+        NumberCultureSettings::from((" ", ","))
     }
 
+    #[test]
+    fn test_number_separator() {
+        // Use enum when it's ok
+        assert_eq!("-5'000.66".to_number_separators::<f32>(NumberCultureSettings::new(Separator::APOSTROPHE, Separator::DOT)).unwrap(), -5000.66);
+        // Use enum when it's not necessary, should work
+        assert_eq!("1000.66".to_number_separators::<f32>(NumberCultureSettings::new(Separator::APOSTROPHE, Separator::COMMA)).unwrap(), 1000.66);
+
+        // Use text
+        assert_eq!("-5{000.66".to_number_separators::<f32>(NumberCultureSettings::new(Separator::CUSTOM('{'), Separator::DOT)).unwrap(), -5000.66);
+        
+        // https://fr.piliapp.com/emoji/list/
+        // Should work
+        assert_eq!("-5🍓000🦀66".to_number_separators::<f32>(NumberCultureSettings::new(Separator::CUSTOM('🍓'), Separator::CUSTOM('🦀'))).unwrap(), -5000.66);
+        assert_eq!("-5🦀🦀🦀🦀🦀000🍓66".to_number_separators::<f32>(NumberCultureSettings::new(Separator::CUSTOM('🦀'), Separator::CUSTOM('🍓'))).unwrap(), -5000.66);
+        
+        
+        assert_eq!("-5🍓000🍓000🦀66".to_number_separators::<f32>(NumberCultureSettings::new(Separator::CUSTOM('🍓'), Separator::CUSTOM('🦀'))).unwrap(), -5000000.66);
+        
+        // It works but it's close to be an invalid separator
+        assert_eq!("-5🍓🍓🍓🍓🍓🍓000🦀66".to_number_separators::<f32>(NumberCultureSettings::new(Separator::CUSTOM('🍓'), Separator::CUSTOM('🦀'))).unwrap(), -5000.66);
+        assert_eq!("-5🍓🍓000🍓🍓000🦀66".to_number_separators::<f32>(NumberCultureSettings::new(Separator::CUSTOM('🍓'), Separator::CUSTOM('🦀'))).unwrap(), -5000000.66);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_number_separator_same_separator() {
+        assert_eq!("-5|000|66".to_number_separators::<f32>(NumberCultureSettings::new(Separator::CUSTOM('|'), Separator::CUSTOM('|'))).unwrap(), -5000.66);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_number_separator_multiple_decimal() {
+        assert_eq!("-5🍓000🦀🦀🦀🦀🦀🦀🦀66".to_number_separators::<f32>(NumberCultureSettings::new(Separator::CUSTOM('🍓'), Separator::CUSTOM('🦀'))).unwrap(), -5000.66);
+    }
     /// Simple integer conversion
     #[test]
     fn number_conversion_integer() {
@@ -264,7 +303,7 @@ mod tests {
         for (string_value, float_value) in list {
             assert_eq!(
                 string_value
-                    .to_number_separators::<f64>(NumberCultureSettings::from((" ", ",", ThousandGrouping::ThreeBlock)))
+                    .to_number_separators::<f64>(NumberCultureSettings::from((" ", ",")))
                     .unwrap(),
                 float_value
             );
@@ -390,4 +429,13 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn escape_special_char_regex() {
+        // escape
+        assert_eq!("\'", escape("'"));
+        assert_eq!("\\|AnyThousandSeparator\\|", escape("|AnyThousandSeparator|"));
+        assert_eq!("🍓", escape("🍓"));
+        assert_eq!("🦀🦀", escape("🦀🦀"));
+    }   
 }

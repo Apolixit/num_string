@@ -1,7 +1,6 @@
 use crate::pattern::ThousandGrouping;
 use crate::pattern::ConvertString;
-use crate::conversion::NumberConversion;
-use crate::pattern::Separator;
+use crate::string_to_number::NumberConversion;
 use crate::ConversionError;
 use crate::Culture;
 use crate::NumberCultureSettings;
@@ -19,14 +18,19 @@ use thousands::Separable;
 /// The max is N9 digit
 /// And the culture parameter is use to display with the selected culture (it automatically
 /// apply the thousand and decimal separator of the given culture)
+/// Or you can specify your custom thousand and decimal separator with NumberCultureSettings
 /// # Example
 /// ```
-/// use num_string::{Culture, ToFormat};
-///     assert_eq!(1000.to_format("N0", Culture::English).unwrap(), "1,000");
-///     assert_eq!(1000.to_format("N2", Culture::French).unwrap(), "1 000,00");
+/// use num_string::{Culture, ToFormat, NumberCultureSettings, Separator};
+///     assert_eq!("1,000", 1000.to_format("N0", Culture::English).unwrap());
+///     assert_eq!("1 000,00", 1000.to_format("N2", Culture::French).unwrap());
+/// 
+///     assert_eq!("1'000.00", 1000.to_format_separators("N2", NumberCultureSettings::new(Separator::APOSTROPHE, Separator::DOT)).unwrap());
+///     assert_eq!("10,00,001.00", 1_000_000.9999.to_format_separators("N2", NumberCultureSettings::new(num_string::Separator::COMMA, num_string::Separator::DOT).with_grouping(num_string::ThousandGrouping::TwoBlock)).unwrap());
 /// ```
 pub trait ToFormat {
-    fn to_format(self, format: &str, culture: Culture) -> Result<String, ConversionError>;
+    fn to_format_separators(self, digit: &str, separators: NumberCultureSettings) -> Result<String, ConversionError>;
+    fn to_format(self, digit: &str, culture: Culture) -> Result<String, ConversionError>;
 }
 
 /// Implement the trait for all primitive (i8, i64, u32, f32 etc.), thanks to Num trait
@@ -35,8 +39,13 @@ where
     T: Num + Display,
 {
     fn to_format(self, digit: &str, culture: Culture) -> Result<String, ConversionError> {
+        self.to_format_separators(digit, culture.into())
+        
+    }
+
+    fn to_format_separators(self, digit: &str, separators: NumberCultureSettings) -> Result<String, ConversionError> {
         let nb_digit = Number::<T>::set_nb_digits(digit)?;
-        Number::<T>::new(self).to_format_options(&culture, FormatOption::new(nb_digit, nb_digit))
+        Number::<T>::new(self).to_format_options(separators, FormatOption::new(nb_digit, nb_digit))
     }
 }
 
@@ -111,12 +120,10 @@ impl<T: num::Num + Display> Number<T> {
     /// Apply the thousand separator to the whole number given in parameter
     /// Thanks to thousands crate
     /// Ref 'test_apply_thousand_separator'
-    fn apply_thousand_separator(num: i32, culture: &Culture) -> String {
-        let culture_settings = NumberCultureSettings::from(*culture);
-
+    fn apply_thousand_separator(num: i32, separators: NumberCultureSettings) -> String {
         num.separate_by_policy(SeparatorPolicy {
-            separator: culture_settings.thousand_separator().into(),
-            groups: culture_settings.thousand_grouping().into(),
+            separator: separators.thousand_separator().to_owned_string().as_str(),
+            groups: separators.thousand_grouping().into(),
             digits: thousands::digits::ASCII_DECIMAL
         })
     }
@@ -175,7 +182,7 @@ impl<T: num::Num + Display> Number<T> {
     /// Apply the format to the number
     pub fn to_format_options(
         &self,
-        culture: &Culture,
+        separators: NumberCultureSettings,
         format: FormatOption,
     ) -> Result<String, ConversionError> {
         trace!("format = {:?}", format);
@@ -186,7 +193,7 @@ impl<T: num::Num + Display> Number<T> {
                 ConvertString::new(format!("{}{}", sign_string, whole_string).as_str(), None)
                     .to_number::<i32>()
                     .unwrap(),
-                culture,
+                separators,
             )
         };
         let mut number_string;
@@ -212,7 +219,7 @@ impl<T: num::Num + Display> Number<T> {
             number_string = format!(
                 "{}{}{}",
                 number_string,
-                NumberCultureSettings::from(*culture).into_decimal_separator_string(),
+                separators.into_decimal_separator_string(),
                 decimal_format
             );
         } else {
@@ -280,10 +287,27 @@ impl Default for FormatOption {
 
 #[cfg(test)]
 mod tests {
-    use crate::number::FormatOption;
-use crate::{number::ToFormat, Culture, errors::ConversionError};
+    use crate::NumberCultureSettings;
+use crate::number_to_string::FormatOption;
+use crate::{number_to_string::ToFormat, Culture, errors::ConversionError};
     use super::Number;
 
+    fn dot_comma() -> NumberCultureSettings {
+        NumberCultureSettings::from((".", ","))
+    }
+    fn comma_dot() -> NumberCultureSettings {
+        NumberCultureSettings::from((",", "."))
+    }
+    fn comma_dot_grouping_two() -> NumberCultureSettings {
+        NumberCultureSettings::from((",", ".")).with_grouping(crate::ThousandGrouping::TwoBlock)
+    }
+    fn space_comma() -> NumberCultureSettings {
+        NumberCultureSettings::from((" ", ","))
+    }
+    fn space_dot() -> NumberCultureSettings {
+        NumberCultureSettings::from((" ", "."))
+    }
+    
     /// Test of 'to_format' function to display number to string with integer values
     #[test]
     pub fn str_to_format_integer() {
@@ -335,7 +359,7 @@ use crate::{number::ToFormat, Culture, errors::ConversionError};
 
     /// Test of 'to_format' function to display number to string with float values
     #[test]
-    pub fn str_to_format_float() {
+    pub fn str_to_format_float_culture() {
         let vals_f64 = vec![
             (1000.48f64, "N0", Culture::French, "1 000"),
             (10000.48, "N2", Culture::French, "10 000,48"),
@@ -356,6 +380,34 @@ use crate::{number::ToFormat, Culture, errors::ConversionError};
         for (val_f64, to_format, culture, string_result) in vals_f64 {
             assert_eq!(
                 val_f64.to_format(to_format, culture).unwrap(),
+                string_result
+            );
+        }
+    }
+
+    #[test]
+    pub fn str_to_format_float_separators() {
+        
+        let vals_f64 = vec![
+            (1000.48f64, "N0", space_comma(), "1 000"),
+            (10000.48, "N2", space_comma(), "10 000,48"),
+            (10000.99, "N4", comma_dot(), "10,000.9900"),
+            (-1000.98, "N0", Culture::italian_culture(), "-1.001"),
+            (-1000.66666, "N3", dot_comma(), "-1.000,667"),
+            (-1000.66666, "N3", comma_dot_grouping_two(), "-1,000.667"),
+            (1., "N2", comma_dot(), "1.00"),
+            (2_000.98, "N0",  dot_comma(), "2.001"),
+            (2_000.98, "N2",  dot_comma(), "2.000,98"),
+            (2_000.98, "N3",  dot_comma(), "2.000,980"),
+            (2_000.9998888, "N3",  dot_comma(), "2.001,000"),
+            (2_000.9998888, "N3",  comma_dot_grouping_two(), "2,001.000"),
+            (10.48, "N2", comma_dot_grouping_two(), "10.48"),
+            (100_000.48, "N2", comma_dot_grouping_two(), "1,00,000.48"),
+        ];
+
+        for (val_f64, to_format, separator, string_result) in vals_f64 {
+            assert_eq!(
+                val_f64.to_format_separators(to_format, separator).expect(format!("Fail to parse {} with separator = {:?}", val_f64, separator).as_str()),
                 string_result
             );
         }
@@ -402,7 +454,7 @@ use crate::{number::ToFormat, Culture, errors::ConversionError};
 
         for (number, culture, to_string_format, format) in floats {
             assert_eq!(
-                Number::new(number).to_format_options(&culture, format).unwrap(),
+                Number::new(number).to_format_options(culture.into(), format).unwrap(),
                 String::from(to_string_format)
             );
         }
@@ -476,7 +528,7 @@ use crate::{number::ToFormat, Culture, errors::ConversionError};
         ];
 
         for (val_i32, culture, val_string) in values {
-            assert_eq!(Number::<i32>::apply_thousand_separator(val_i32, &culture), val_string)
+            assert_eq!(Number::<i32>::apply_thousand_separator(val_i32, culture.into()), val_string)
         }
     }
 }

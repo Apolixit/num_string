@@ -1,8 +1,8 @@
 use crate::errors::ConversionError;
-use crate::conversion::NumberConversion;
+use crate::string_to_number::NumberConversion;
 use crate::Culture;
 use log::{info, warn};
-use regex::Regex;
+use regex::{Regex, escape};
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -33,50 +33,78 @@ pub enum Separator {
     DOT,
     COMMA,
     APOSTROPHE,
+    CUSTOM(char)
 }
 
 impl Separator {
     fn to_string_regex(&self) -> String {
-        match self {
-            Separator::COMMA => String::from(r"[\\,]"),
-            Separator::DOT => String::from(r"[\\.]"),
-            Separator::SPACE => String::from(r"[\s]"),
-            Separator::APOSTROPHE => String::from(r"[\\']"),
-        }
+        format!("[{}]", match self {
+            Separator::COMMA => escape(","),
+            Separator::DOT => escape("."),
+            Separator::SPACE => r"\s".to_string(),
+            Separator::APOSTROPHE => escape("'"),
+            Separator::CUSTOM(c) => escape(c.to_string().as_str())
+        })
     }
 
     pub fn to_owned_string(&self) -> String {
-        match self {
-            Separator::COMMA => String::from(","),
-            Separator::DOT => String::from("."),
-            Separator::SPACE => String::from(" "),
-            Separator::APOSTROPHE => String::from("'"),
+        (*self).into()
+    }
+}
+
+// /// Get string slice from Separator
+// impl From<Separator> for &str {
+//     fn from(e: Separator) -> Self {
+//         let s: String = e.into();
+//         s.as_str().c
+//         // match e {
+//         //     Separator::COMMA => Cow::Borrowed(",").borrow(),
+//         //     Separator::DOT => ".",
+//         //     Separator::SPACE => " ",
+//         //     Separator::APOSTROPHE => "'",
+//         //     Separator::CUSTOM(c) => &c.to_string(),
+//         // }
+//     }
+// }
+
+/// Get owned string from Separator
+impl From<Separator> for String {
+    fn from(e: Separator) -> Self {
+        match e {
+            Separator::COMMA => ",".to_owned(),
+            Separator::DOT => ".".to_owned(),
+            Separator::SPACE => " ".to_owned(),
+            Separator::APOSTROPHE => "'".to_owned(),
+            Separator::CUSTOM(c) => c.to_string(),
         }
     }
 }
 
-/// Get string slice from Separator
-impl From<Separator> for &str {
+/// Get char from separator
+impl From<Separator> for char {
     fn from(e: Separator) -> Self {
         match e {
-            Separator::COMMA => ",",
-            Separator::DOT => ".",
-            Separator::SPACE => " ",
-            Separator::APOSTROPHE => "'",
+            Separator::COMMA => ',',
+            Separator::DOT => '.',
+            Separator::SPACE => ' ',
+            Separator::APOSTROPHE => '\'',
+            Separator::CUSTOM(c) => c,
         }
     }
 }
 
 /// Try get Separator from string slice
-impl TryFrom<&str> for Separator {
+impl TryFrom<&'static str> for Separator {
     type Error = ConversionError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &'static str) -> Result<Self, Self::Error> {
         match value {
             "," => Ok(Separator::COMMA),
             "." => Ok(Separator::DOT),
             " " => Ok(Separator::SPACE),
-            _ => Err(ConversionError::SeparatorNotFound),
+            // I'm pretty sure we can have a huge better syntax here...
+            s if s.len() == 1 => Ok(Separator::CUSTOM(s.to_string().chars().collect::<Vec<char>>()[0])),
+            _ => Err(ConversionError::SeparatorNotFound)
         }
     }
 }
@@ -317,6 +345,10 @@ impl ParsingPattern {
     pub fn get_number_type(&self) -> &NumberType {
         &self.number_type
     }
+
+    pub fn name(&self) -> &str {
+        self.name.as_ref()
+    }
 }
 
 /// Represent the current thousand and decimal separator
@@ -332,33 +364,20 @@ impl NumberCultureSettings {
     pub fn new(
         thousand_separator: Separator,
         decimal_separator: Separator,
-        thousand_grouping: ThousandGrouping,
     ) -> NumberCultureSettings {
+        assert!(thousand_separator != decimal_separator);
+
         NumberCultureSettings {
             thousand_separator,
             decimal_separator,
-            thousand_grouping,
+            thousand_grouping: ThousandGrouping::ThreeBlock,
         }
     }
 
-    /// Get English culture settings
-    pub fn english_culture() -> NumberCultureSettings {
-        NumberCultureSettings::new(Separator::COMMA, Separator::DOT, ThousandGrouping::ThreeBlock)
-    }
-
-    /// Get French culture settings
-    pub fn french_culture() -> NumberCultureSettings {
-        NumberCultureSettings::new(Separator::SPACE, Separator::COMMA, ThousandGrouping::ThreeBlock)
-    }
-
-    /// Get Italian culture settings
-    pub fn italian_culture() -> NumberCultureSettings {
-        NumberCultureSettings::new(Separator::DOT, Separator::COMMA, ThousandGrouping::ThreeBlock)
-    }
-
-    /// Get Indian culture settings
-    pub fn indian_culture() -> NumberCultureSettings {
-        NumberCultureSettings::new(Separator::COMMA, Separator::DOT, ThousandGrouping::TwoBlock)
+    /// Set the thousand grouping value (didn't want to expose it in the constructor)
+    pub fn with_grouping(mut self, thousand_grouping: ThousandGrouping) -> Self {
+        self.thousand_grouping = thousand_grouping;
+        self
     }
 
     pub fn thousand_separator(&self) -> Separator {
@@ -369,6 +388,10 @@ impl NumberCultureSettings {
         self.thousand_separator.to_owned_string()
     }
 
+    pub fn into_thousand_separator_regex(&self) -> String {
+        self.thousand_separator.to_string_regex()
+    }
+
     pub fn decimal_separator(&self) -> Separator {
         self.decimal_separator
     }
@@ -377,28 +400,21 @@ impl NumberCultureSettings {
         self.decimal_separator.to_owned_string()
     }
 
+    pub fn into_decimal_separator_regex(&self) -> String {
+        self.decimal_separator.to_string_regex()
+    }
+
     pub fn thousand_grouping(&self) -> ThousandGrouping {
         self.thousand_grouping
     }
 }
 
 
-impl From<(&str, &str)> for NumberCultureSettings {
-    fn from(val: (&str, &str)) -> Self {
+impl From<(&'static str, &'static str)> for NumberCultureSettings {
+    fn from(val: (&'static str, &'static str)) -> Self {
         NumberCultureSettings::new(
             Separator::try_from(val.0).unwrap(),
-            Separator::try_from(val.1).unwrap(),
-            ThousandGrouping::ThreeBlock
-        )
-    }
-}
-
-impl From<(&str, &str, ThousandGrouping)> for NumberCultureSettings {
-    fn from(val: (&str, &str, ThousandGrouping)) -> Self {
-        let mut instance = NumberCultureSettings::from((val.0, val.1));
-        instance.thousand_grouping = val.2;
-
-        instance
+            Separator::try_from(val.1).unwrap())
     }
 }
 
@@ -406,10 +422,10 @@ impl From<(&str, &str, ThousandGrouping)> for NumberCultureSettings {
 impl From<Culture> for NumberCultureSettings {
     fn from(culture: Culture) -> Self {
         match culture {
-            Culture::English => NumberCultureSettings::english_culture(),
-            Culture::French => NumberCultureSettings::french_culture(),
-            Culture::Italian => NumberCultureSettings::italian_culture(),
-            Culture::Indian => NumberCultureSettings::indian_culture(),
+            Culture::English => Culture::english_culture(),
+            Culture::French => Culture::french_culture(),
+            Culture::Italian => Culture::italian_culture(),
+            Culture::Indian => Culture::indian_culture(),
         }
     }
 }
@@ -532,19 +548,21 @@ impl Default for NumberPatterns {
             ParsingPattern::build(String::from("Common"), TypeParsing::WholeSimple, None).unwrap(),
         );
 
+        // Loop over culture enum
+
         // French pattern
         patterns.add_culture_pattern(
-            CulturePattern::new("fr", NumberCultureSettings::french_culture()).unwrap(),
+            CulturePattern::new("fr", Culture::french_culture()).unwrap(),
         );
 
         // English pattern
         patterns.add_culture_pattern(
-            CulturePattern::new("en", NumberCultureSettings::english_culture()).unwrap(),
+            CulturePattern::new("en", Culture::english_culture()).unwrap(),
         );
 
         // Italian pattern
         patterns.add_culture_pattern(
-            CulturePattern::new("it", NumberCultureSettings::italian_culture()).unwrap(),
+            CulturePattern::new("it", Culture::italian_culture()).unwrap(),
         );
 
         patterns
@@ -666,7 +684,6 @@ mod tests {
     use crate::errors::ConversionError;
     use crate::pattern::ConvertString;
     use crate::pattern::CulturePattern;
-    use crate::pattern::ThousandGrouping;
     use crate::pattern::TypeParsing;
     use crate::Culture;
     use crate::NumberCultureSettings;
@@ -700,9 +717,9 @@ mod tests {
 
     #[test]
     fn test_separator() {
-        let comma_str: &str = Separator::COMMA.into();
-        assert_eq!(",", comma_str);
-        assert_eq!(Separator::SPACE, Separator::try_from(" ").unwrap());
+        let comma_str: char = Separator::COMMA.into();
+        assert_eq!(',', comma_str);
+        assert_eq!(Separator::SPACE, " ".try_into().unwrap());
         assert_eq!(
             Err(ConversionError::SeparatorNotFound),
             Separator::try_from("i_am_not_well_formatted")
@@ -710,9 +727,10 @@ mod tests {
 
         assert_eq!(Separator::DOT.to_owned_string(), String::from("."));
 
-        assert_eq!(Separator::COMMA.to_string_regex(), String::from(r"[\\,]"));
-        assert_eq!(Separator::DOT.to_string_regex(), String::from(r"[\\.]"));
+        assert_eq!(Separator::COMMA.to_string_regex(), String::from("[,]"));
+        assert_eq!(Separator::DOT.to_string_regex(), String::from("[\\.]"));
         assert_eq!(Separator::SPACE.to_string_regex(), String::from(r"[\s]"));
+        assert_eq!(Separator::SPACE.to_string_regex(), String::from("[\\s]"));
     }
 
     #[test]
@@ -749,13 +767,13 @@ mod tests {
     }
 
     #[test]
-    fn test_generated_regex() {
+    fn test_generated_regex_culture() {
         let french_culture =
-            CulturePattern::new("fr", NumberCultureSettings::french_culture()).unwrap();
+            CulturePattern::new("fr", Culture::french_culture()).unwrap();
         let english_culture =
-            CulturePattern::new("en", NumberCultureSettings::english_culture()).unwrap();
+            CulturePattern::new("en", Culture::english_culture()).unwrap();
         let italian_culture =
-            CulturePattern::new("it", NumberCultureSettings::italian_culture()).unwrap();
+            CulturePattern::new("it", Culture::italian_culture()).unwrap();
 
         assert_eq!(french_culture.get_name(), "fr");
         assert_eq!(english_culture.get_name(), "en");
@@ -773,7 +791,7 @@ mod tests {
         assert_eq!(fr_decimal_simple.name, String::from("FR_Decimal_Simple"));
         assert_eq!(
             fr_decimal_simple.regex.content.as_str(),
-            r"[\-\+]?[0-9]+[\\,][0-9]{1,}",
+            r"[\-\+]?[0-9]+[,][0-9]{1,}",
             "Error french culture DecimalSimple"
         );
 
@@ -786,7 +804,7 @@ mod tests {
                 .regex
                 .content
                 .as_str(),
-            r"[\-\+]?[\\,][0-9]+",
+            r"[\-\+]?[,][0-9]+",
             "Error french culture DecimalWithoutWholePart"
         );
         assert_eq!(
@@ -810,7 +828,7 @@ mod tests {
                 .regex
                 .content
                 .as_str(),
-            r"[\-\+]?[0-9]+([\s][0-9]{3})+[\\,][0-9]*",
+            r"[\-\+]?[0-9]+([\s][0-9]{3})+[,][0-9]*",
             "Error french culture DecimalThousandSeparator"
         );
 
@@ -823,7 +841,7 @@ mod tests {
                 .regex
                 .content
                 .as_str(),
-            r"[\-\+]?[0-9]+[\\.][0-9]{1,}",
+            r"[\-\+]?[0-9]+[\.][0-9]{1,}",
             "Error english culture DecimalSimple"
         );
         assert_eq!(
@@ -835,7 +853,7 @@ mod tests {
                 .regex
                 .content
                 .as_str(),
-            r"[\-\+]?[\\.][0-9]+",
+            r"[\-\+]?[\.][0-9]+",
             "Error english culture DecimalWithoutWholePart"
         );
 
@@ -850,7 +868,7 @@ mod tests {
         );
         assert_eq!(
             en_whole_thousand_separator.regex.content.as_str(),
-            r"[\-\+]?[0-9]+([\\,][0-9]{3})+",
+            r"[\-\+]?[0-9]+([,][0-9]{3})+",
             "Error english culture WholeThousandSeparator"
         );
         assert_eq!(
@@ -862,7 +880,7 @@ mod tests {
                 .regex
                 .content
                 .as_str(),
-            r"[\-\+]?[0-9]+([\\,][0-9]{3})+[\\.][0-9]*",
+            r"[\-\+]?[0-9]+([,][0-9]{3})+[\.][0-9]*",
             "Error english culture DecimalThousandSeparator"
         );
 
@@ -875,7 +893,7 @@ mod tests {
                 .regex
                 .content
                 .as_str(),
-            r"[\-\+]?[0-9]+[\\,][0-9]{1,}",
+            r"[\-\+]?[0-9]+[,][0-9]{1,}",
             "Error italian culture DecimalSimple"
         );
         assert_eq!(
@@ -887,7 +905,7 @@ mod tests {
                 .regex
                 .content
                 .as_str(),
-            r"[\-\+]?[\\,][0-9]+",
+            r"[\-\+]?[,][0-9]+",
             "Error italian culture DecimalWithoutWholePart"
         );
         assert_eq!(
@@ -899,7 +917,7 @@ mod tests {
                 .regex
                 .content
                 .as_str(),
-            r"[\-\+]?[0-9]+([\\.][0-9]{3})+",
+            r"[\-\+]?[0-9]+([\.][0-9]{3})+",
             "Error italian culture WholeThousandSeparator"
         );
 
@@ -914,23 +932,22 @@ mod tests {
         );
         assert_eq!(
             it_decimal_thousand_separator.regex.content.as_str(),
-            r"[\-\+]?[0-9]+([\\.][0-9]{3})+[\\,][0-9]*",
+            r"[\-\+]?[0-9]+([\.][0-9]{3})+[,][0-9]*",
             "Error italian culture DecimalThousandSeparator"
         );
     }
 
-    #[test]
-    fn test_number_culture_settings() {
-        //NumberCultureSettings
-        assert_eq!(
-            NumberCultureSettings::from((" ", ",", ThousandGrouping::ThreeBlock)),
-            NumberCultureSettings::french_culture()
-        );
-        assert_eq!(
-            NumberCultureSettings::from(Culture::English),
-            NumberCultureSettings::english_culture()
-        );
-    }
+    // #[test]
+    // fn test_number_culture_settings() {
+    //     assert_eq!(
+    //         NumberCultureSettings::from((" ", ",", ThousandGrouping::ThreeBlock)),
+    //         Culture::french_culture()
+    //     );
+    //     assert_eq!(
+    //         NumberCultureSettings::from(Culture::English),
+    //         Culture::english_culture()
+    //     );
+    // }
 
     #[test]
     fn test_common_number() {
@@ -1097,5 +1114,14 @@ mod tests {
                 assert_eq!(convert.is_numeric(), false, "Numeric shouldn't be parsed");
             }
         }
+    }
+
+    #[test]
+    fn number_culture_settings_regex() {
+        // '\\' | '.' | '+' | '*' | '?' | '(' | ')' | '|' | '[' | ']' | '{' | '}' | '^' | '$' | '#' | '&' | '-' | '~'
+        let basic1 = NumberCultureSettings::new(Separator::CUSTOM('|'), Separator::DOT);
+
+        // assert_eq!(String::from("$"), basic1.into_thousand_separator_regex());
+        log::info!("{}", basic1.into_thousand_separator_regex());
     }
 }
