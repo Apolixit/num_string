@@ -304,9 +304,6 @@ use crate::{number_to_string::ToFormat, Culture, errors::ConversionError};
     fn space_comma() -> NumberCultureSettings {
         NumberCultureSettings::from((" ", ","))
     }
-    fn space_dot() -> NumberCultureSettings {
-        NumberCultureSettings::from((" ", "."))
-    }
     
     /// Test of 'to_format' function to display number to string with integer values
     #[test]
@@ -392,7 +389,7 @@ use crate::{number_to_string::ToFormat, Culture, errors::ConversionError};
             (1000.48f64, "N0", space_comma(), "1 000"),
             (10000.48, "N2", space_comma(), "10 000,48"),
             (10000.99, "N4", comma_dot(), "10,000.9900"),
-            (-1000.98, "N0", Culture::italian_culture(), "-1.001"),
+            (-1000.98, "N0", Culture::Italian.into(), "-1.001"),
             (-1000.66666, "N3", dot_comma(), "-1.000,667"),
             (-1000.66666, "N3", comma_dot_grouping_two(), "-1,000.667"),
             (1., "N2", comma_dot(), "1.00"),

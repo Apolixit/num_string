@@ -422,10 +422,10 @@ impl From<(&'static str, &'static str)> for NumberCultureSettings {
 impl From<Culture> for NumberCultureSettings {
     fn from(culture: Culture) -> Self {
         match culture {
-            Culture::English => Culture::english_culture(),
-            Culture::French => Culture::french_culture(),
-            Culture::Italian => Culture::italian_culture(),
-            Culture::Indian => Culture::indian_culture(),
+            Culture::English => NumberCultureSettings::new(Separator::COMMA, Separator::DOT),
+            Culture::French => NumberCultureSettings::new(Separator::SPACE, Separator::COMMA),
+            Culture::Italian => NumberCultureSettings::new(Separator::DOT, Separator::COMMA),
+            Culture::Indian => NumberCultureSettings::new(Separator::COMMA, Separator::DOT).with_grouping(ThousandGrouping::TwoBlock),
         }
     }
 }
@@ -549,21 +549,9 @@ impl Default for NumberPatterns {
         );
 
         // Loop over culture enum
-
-        // French pattern
-        patterns.add_culture_pattern(
-            CulturePattern::new("fr", Culture::french_culture()).unwrap(),
-        );
-
-        // English pattern
-        patterns.add_culture_pattern(
-            CulturePattern::new("en", Culture::english_culture()).unwrap(),
-        );
-
-        // Italian pattern
-        patterns.add_culture_pattern(
-            CulturePattern::new("it", Culture::italian_culture()).unwrap(),
-        );
+        for culture in enum_iterator::all::<Culture>().collect::<Vec<Culture>>().into_iter() {
+            patterns.add_culture_pattern(CulturePattern::new(culture.into(), culture.into()).unwrap())
+        }
 
         patterns
     }
@@ -769,11 +757,11 @@ mod tests {
     #[test]
     fn test_generated_regex_culture() {
         let french_culture =
-            CulturePattern::new("fr", Culture::french_culture()).unwrap();
+            CulturePattern::new("fr", Culture::French.into()).unwrap();
         let english_culture =
-            CulturePattern::new("en", Culture::english_culture()).unwrap();
+            CulturePattern::new("en", Culture::English.into()).unwrap();
         let italian_culture =
-            CulturePattern::new("it", Culture::italian_culture()).unwrap();
+            CulturePattern::new("it", Culture::Italian.into()).unwrap();
 
         assert_eq!(french_culture.get_name(), "fr");
         assert_eq!(english_culture.get_name(), "en");

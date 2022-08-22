@@ -118,7 +118,7 @@ pub use string_to_number::NumberConversion;
 pub use pattern::{ConvertString, NumberCultureSettings, Separator, ThousandGrouping};
 
 /// Represent the current "ConvertString" culture
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Debug, Clone, Copy, enum_iterator::Sequence)]
 pub enum Culture {
     English,
     French,
@@ -126,32 +126,21 @@ pub enum Culture {
     Indian
 }
 
-impl Culture {
-    /// Get English culture settings
-    pub fn english_culture() -> NumberCultureSettings {
-        NumberCultureSettings::new(Separator::COMMA, Separator::DOT)
-    }
-
-    /// Get French culture settings
-    pub fn french_culture() -> NumberCultureSettings {
-        NumberCultureSettings::new(Separator::SPACE, Separator::COMMA)
-    }
-
-    /// Get Italian culture settings
-    pub fn italian_culture() -> NumberCultureSettings {
-        NumberCultureSettings::new(Separator::DOT, Separator::COMMA)
-    }
-
-    /// Get Indian culture settings
-    pub fn indian_culture() -> NumberCultureSettings {
-        NumberCultureSettings::new(Separator::COMMA, Separator::DOT).with_grouping(ThousandGrouping::TwoBlock)
-    }
-}
-
 /// Default culture = English
 impl Default for Culture {
     fn default() -> Self {
         Culture::English
+    }
+}
+
+impl From<Culture> for &str {
+    fn from(c: Culture) -> Self {
+        match c {
+            Culture::English => "en",
+            Culture::French => "fr",
+            Culture::Italian => "it",
+            Culture::Indian => "id"
+        }
     }
 }
 
